@@ -52,25 +52,60 @@
 <div class="content" id="content"></div>
 
 <script>
+ // Funkcja do pobierania obrazka z podanego URL
+function fetchImageFromUrl(url) {
+  return fetch(url)
+    .then(response => response.text())
+    .then(html => {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      // Przykład: szukamy obrazka o klasie 'product-image'
+      const image = doc.querySelector('.product-image');
+      if (image) {
+        return image.src;
+      } else {
+        throw new Error('Obrazek nie został znaleziony.');
+      }
+    });
+}
+
 // Funkcja do ładowania wpisów
 function loadPosts() {
   fetch('lego.json')
     .then(response => response.json())
     .then(data => {
       data.forEach(post => {
-        const postElement = document.createElement('div');
-        postElement.classList.add('post');
-        postElement.innerHTML = `
-          <img src="${post.image || post.link}/favicon.ico" alt="">
-          <p>${post.text}</p>
-        `;
-        postElement.addEventListener('click', () => {
-          window.location.href = post.link;
-        });
-        document.getElementById('content').appendChild(postElement);
+        // Jeśli obrazek nie jest podany, użyj funkcji fetchImageFromUrl
+        if (!post.image) {
+          fetchImageFromUrl(post.link)
+            .then(imageSrc => {
+              createPostElement(post.text, imageSrc, post.link);
+            })
+            .catch(error => {
+              console.error('Błąd:', error);
+              // Jeśli nie uda się pobrać obrazka, użyj favicony
+              createPostElement(post.text, `${post.link}/favicon.ico`, post.link);
+            });
+        } else {
+          createPostElement(post.text, post.image, post.link);
+        }
       });
     })
     .catch(error => console.error('Błąd:', error));
+}
+
+// Funkcja do tworzenia elementu posta
+function createPostElement(text, imageUrl, linkUrl) {
+  const postElement = document.createElement('div');
+  postElement.classList.add('post');
+  postElement.innerHTML = `
+    <img src="${imageUrl}" alt="">
+    <p>${text}</p>
+  `;
+  postElement.addEventListener('click', () => {
+    window.location.href = linkUrl;
+  });
+  document.getElementById('content').appendChild(postElement);
 }
 
 // Ładowanie wpisów przy starcie
