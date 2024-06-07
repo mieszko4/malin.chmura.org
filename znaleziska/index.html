@@ -5,6 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Znaleziska</title>
 <style>
+    .sticky-header {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    background-color: #333;
+    color: white;
+    text-align: center;
+    padding: 10px 0;
+    z-index: 1000;
+  }
+  .title {
+    font-size: 2em;
+    background: -webkit-linear-gradient(left, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .content {
+    padding-top: 50px; /* Odstęp na wysokość sticky header */
+  }
   .box {
     border: 1px solid #000;
     margin: 10px;
@@ -46,7 +65,10 @@
 </style>
 </head>
 <body>
-
+<div class="sticky-header">
+ <div class="title">Znaleziska</div>
+</div>
+  
 <div id="lego" class="box" onclick="location.href='url-do-lego.html';" >
   <img src="lego.jpg" alt="LEGO i klocki kompatybilne">
   LEGO i klocki kompatybilne
