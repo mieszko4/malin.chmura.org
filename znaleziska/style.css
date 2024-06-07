@@ -1,0 +1,35 @@
+/* Styl ogólny dla wszystkich boxów */
+.box {
+  border: 1px solid #000;
+  margin: 10px;
+  padding: 20px;
+  text-align: center;
+  transition: background-color 0.5s;
+  cursor: pointer;
+}
+
+/* Efekt hover dla boxów */
+.box:hover {
+  background-color: #f0f0f0;
+}
+
+/* Indywidualne style dla każdego boxu */
+#lego {
+  background-color: #ff0000;
+}
+
+#home-assistant {
+  background-color: #00ff00;
+}
+
+#komputery {
+  background-color: #0000ff;
+}
+
+#agd {
+  background-color: #ffff00;
+}
+
+#inne {
+  background-color: #ff00ff;
+}
