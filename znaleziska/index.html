@@ -22,7 +22,11 @@
     -webkit-text-fill-color: transparent;
   }
   .content {
-    padding-top: 50px; /* Odstęp na wysokość sticky header */
+    padding-top: 70px; /* Zwiększ odstęp na wysokość sticky header z logotypem */
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+  }
   }
   .box {
     border: 1px solid #000;
@@ -37,7 +41,7 @@
   }
   .box:hover {
     background-color: #f0f0f0;
-    transform: scale(1.05); /* Powiększa box o 5% */
+    transform: scale(1.5); /* Powiększa box o 5% */
     box-shadow: 0 5px 15px rgba(0,0,0,0.3); /* Dodaje cień dla efektu głębi */
   }
   
@@ -66,6 +70,7 @@
 </head>
 <body>
 <div class="sticky-header">
+ <img src="logo.jpg" alt="Logotyp Znaleziska">    
  <div class="title">Znaleziska</div>
 </div>
   
