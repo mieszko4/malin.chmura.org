@@ -1,0 +1,16 @@
+[
+  {
+    "text": "To jest przykładowy tekst pierwszego wpisu.",
+    "link": "https://przykladowy-link.pl",
+    "image": "https://przykladowy-obrazek.pl/obrazek1.jpg"
+  },
+  {
+    "text": "Tutaj mamy tekst drugiego wpisu, ale bez obrazka.",
+    "link": "https://przykladowy-link2.pl"
+  },
+  {
+    "text": "Kolejny wpis z obrazkiem i tekstem.",
+    "link": "https://przykladowy-link3.pl",
+    "image": "https://przykladowy-obrazek.pl/obrazek3.jpg"
+  }
+]
