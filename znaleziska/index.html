@@ -15,28 +15,49 @@
   .box:hover {
     background-color: #f0f0f0;
   }
+  
+/* Indywidualne style dla każdego boxu */
+#lego {
+  background-color: #ff0000;
+}
+
+#home-assistant {
+  background-color: #00ff00;
+}
+
+#komputery {
+  background-color: #0000ff;
+}
+
+#agd {
+  background-color: #ffff00;
+}
+
+#inne {
+  background-color: #ff00ff;
+}
   /* Tutaj możesz dodać specyficzne style dla każdego boxu, np. tło */
 </style>
 </head>
 <body>
 
-<div class="box" onclick="location.href='url-do-lego.html';" style="background-color: #ff0000;">
+<div id="lego" class="box" onclick="location.href='url-do-lego.html';" >
   LEGO i klocki kompatybilne
 </div>
 
-<div class="box" onclick="location.href='url-do-home-assistant.html';" style="background-color: #00ff00;">
+<div id = "home-assistant" class="box" onclick="location.href='url-do-home-assistant.html';" >
   Home Assistant i automatyzacje
 </div>
 
-<div class="box" onclick="location.href='url-do-komputery.html';" style="background-color: #0000ff;">
+<div id = "komputery" class="box" onclick="location.href='url-do-komputery.html';" >
   Komputery, telefony lub tablety
 </div>
 
-<div class="box" onclick="location.href='url-do-agd.html';" style="background-color: #ffff00;">
+<div id = "agd" class="box" onclick="location.href='url-do-agd.html';" >
   Urządzenia AGD
 </div>
 
-<div class="box" onclick="location.href='url-do-inne.html';" style="background-color: #ff00ff;">
+<div id = "inne" class="box" onclick="location.href='url-do-inne.html';" >
   Inne
 </div>
 
