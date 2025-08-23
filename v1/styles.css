@@ -1,0 +1,262 @@
+/* --- Podstawowy layout --- */
+body {
+  background-color: #121212;
+  color: white;
+  font-family: Arial, sans-serif;
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Cała aplikacja przewijana */
+#app {
+  flex: 1;
+  overflow-y: auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative; /* <--- dla sprite'ów */
+}
+
+#app.with-elevator {
+  padding-left: 64px; /* miejsce na szyb po lewej stronie */
+}
+@media (max-width: 600px) {
+  #app.with-elevator { padding-left: 56px; }
+}
+
+/* Reset przycisku w rogu */
+#btn-reset {
+  position: absolute;
+  right: 0;
+  top: 8px;
+  background: #e54;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  z-index: 11000;
+  user-select: none;
+}
+
+/* Licznik diamentów zawsze u góry */
+#player-diamonds {
+  font-size: 1.4rem;
+  font-weight: 700;
+  width: 100%;
+  padding: 12px 16px;
+  background: #121212;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  text-align: center;
+  border-bottom: 2px solid #333;
+}
+
+/* Drużyna / korytarze */
+#team {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border: none; /* removed debug border */
+}
+
+/* Pojedynczy korytarz */
+.corridor {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #222;
+  border-radius: 16px;
+  padding: 10px 12px;
+  min-height: 48px;
+  position: relative;
+}
+
+/* Bohater w korytarzu */
+.hero-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 200px;
+  max-width: 220px;
+  flex-shrink: 0;
+  word-break: break-word;
+  font-weight: 700;
+}
+
+.hero-icon { font-size: 2.3rem; flex-shrink: 0; }
+.hero-name { font-size: 0.85rem; line-height: 1.2; word-wrap: break-word; }
+
+/* Wiadro na diamenty pomiędzy bohaterem a korytarzem */
+.bucket { min-width: 64px; display:flex; flex-direction:column; align-items:center; gap:4px; flex-shrink:0; cursor: pointer; }
+.bucket-icon { font-size:1.1rem; }
+.bucket-cap { font-size:0.75rem; color:#cbd5e1; }
+.bucket-bar { width:44px; height:9px; background:#2b2b2b; border-radius:6px; overflow:hidden; }
+.bucket-fill { height:100%; width:0%; background:#ffd166; transition: width 0.25s linear; }
+.bucket:hover .bucket-icon { transform: translateY(-2px); }
+
+/* Pasek korytarza */
+.wall { flex-grow: 1; min-width: 0; height: 22px; background: #555; border-radius: 10px; position: relative; display: flex; /* <--- Dodaj to */
+  align-items: center }
+.wall-fill { height: 80%; width: 80%; background: #0cb1d6; border-radius: 10px; transition: left 0.25s linear, width 0.25s linear; }
+
+/* Etykieta pokazująca pozostałe diamenty na ścianie */
+.wall-label {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.75rem;
+  color: #ffffff;
+  background: rgba(0,0,0,0.35);
+  padding: 3px 6px;
+  border-radius: 6px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Pozycja bohatera */
+.hero-position { position: absolute; top: 0px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 2px solid #0c80a6; transition: left 0.3s cubic-bezier(.4,0,.2,1); }
+/* Usunięto ring progressu z bohatera w korytarzu – tylko w szybie */
+.hero-position::after { content: none; }
+.hero-position > div { transform: scale(1.2); pointer-events: none; user-select: none; }
+.hero-position.unloading { left: 0% !important; transition: none !important; }
+
+/* Pasek postępu */
+.progress-container, .progress-fill { display: none !important; }
+
+/* Przycisk Kop */
+button#btn-mine { margin: 12px 0; width: 160px; font-weight: 900; font-size: 1.3rem; padding: 14px 0; border-radius: 16px; border: none; background: #0cb1d6; color: #121212; cursor: pointer; transition: background 0.3s; }
+button#btn-mine:hover { background: #0899bb; }
+
+/* Sklep */
+.shop-container { background: #222; border-radius: 16px; padding: 16px 20px; margin-top: 4px; width: 100%; max-width: 640px; }
+.shop-title { font-weight: 900; font-size: 1.2rem; margin-bottom: 12px; text-align: center; }
+.shop-list { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; height: 110px; }
+.shop-list::-webkit-scrollbar { height: 5px; }
+.shop-list::-webkit-scrollbar-thumb { background: #0cb1d6; border-radius: 4px; }
+.shop-item { background: #333; border-radius: 16px; min-width: 90px; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 12px 8px; box-shadow: 0 0 8px #0cb1d6bb; cursor: pointer; transition: background-color 0.3s; flex-shrink: 0; }
+.shop-item:hover { background: #0cb1d6; color: #121212; }
+.shop-icon { font-size: 2.7rem; }
+.shop-name { margin-top: 8px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shop-cost { font-weight: 700; margin-top: 6px; }
+
+/* --- Sprite diamentu --- */
+.diamond-sprite {
+  position: fixed; /* zgodne z animacją JS */
+  font-size: 2rem;
+  pointer-events: none;
+  user-select: none;
+  animation: none; /* legacy animation removed - JS controls motion */
+  z-index: 10000;
+}
+
+/* removed legacy @keyframes diamond-move to avoid conflicts with JS animation */
+
+/* Ikona windziarza w szybie z okrągłym wskaźnikiem postępu */
+.wz-node {
+  position: absolute;
+  width: var(--ring, 56px);
+  height: var(--ring, 56px);
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  border: 2px solid #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #111;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+}
+
+.wz-node::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  background: conic-gradient(#06d6a0 calc(var(--prog, 0) * 1deg), transparent 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(50% - 7px), #000 calc(50% - 7px));
+  mask: radial-gradient(farthest-side, transparent calc(50% - 7px), #000 calc(50% - 7px));
+}
+.wz-node .wz-icon {
+  font-size: var(--icon, 58px);
+  line-height: 1;
+  user-select: none;
+  pointer-events: none;
+}
+
+#popup {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.45);
+  z-index: 12000;
+}
+#popup[style*="display: flex"] {
+  display: flex !important;
+}
+#popup-content {
+  background: #222;
+  border-radius: 18px;
+  box-shadow: 0 8px 32px #000a;
+  padding: 32px 24px;
+  min-width: 260px;
+  max-width: 90vw;
+  max-height: 90vh;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+#popup-content h3 {
+  font-size: 1.3rem;
+  margin-bottom: 12px;
+}
+#popup-content .stat {
+  font-size: 1rem;
+  margin-bottom: 8px;
+}
+#popup-action, #popup-close {
+  margin: 12px 0 0 0;
+  padding: 14px 32px;
+  font-size: 1.1rem;
+  border-radius: 14px;
+  border: none;
+  background: #0cb1d6;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px #0003;
+  cursor: pointer;
+  transition: background 0.2s;
+  outline: none;
+}
+#popup-action:hover, #popup-close:hover {
+  background: #0899bb;
+}
+@media (max-width: 600px) {
+  #popup-content {
+    padding: 18px 8px;
+    min-width: 180px;
+  }
+  #popup-action, #popup-close {
+    padding: 12px 16px;
+    font-size: 1rem;
+  }
+}
