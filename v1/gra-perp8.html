@@ -1372,17 +1372,97 @@
     location.reload();
   };
 
-  // przycisk ręcznego kopania
+  // --- KOP button delay logic ---
+  const FREE_DIAMONDS_PER_HOUR = 2000;
+  const FREE_DIAMONDS_DELAY = 500; // ms (zmniejszono z 1000)
+  const REFRESH_DELAY = 60 * 60 * 1000; // 60 min in ms
+  let freeDiamonds = FREE_DIAMONDS_PER_HOUR;
+  let lastFreeDiamondsRefill = Date.now();
+  let kopDelayUntil = 0;
+  let kopRefreshUntil = 0;
+
+  function refillFreeDiamondsIfNeeded() {
+    const now = Date.now();
+    if (now - lastFreeDiamondsRefill >= 3600 * 1000) {
+      freeDiamonds = FREE_DIAMONDS_PER_HOUR;
+      lastFreeDiamondsRefill = now;
+      kopRefreshUntil = 0;
+    }
+  }
+
+  function updateKopButtonState() {
+    refillFreeDiamondsIfNeeded();
+    const now = Date.now();
+    let disabled = false;
+    let progress = 0;
+    let label = "Kop";
+    if (kopDelayUntil > now) {
+      disabled = true;
+      progress = 1 - (kopDelayUntil - now) / FREE_DIAMONDS_DELAY;
+      label = `Kop (${Math.ceil((kopDelayUntil-now)/1000)}s)`;
+    } else if (freeDiamonds <= 0) {
+      disabled = true;
+      if (kopRefreshUntil > now) {
+        progress = 1 - (kopRefreshUntil - now) / REFRESH_DELAY;
+        const left = Math.ceil((kopRefreshUntil-now)/1000);
+        label = `Doładowanie za ${Math.floor(left/60)}:${(left%60).toString().padStart(2,'0')}`;
+      } else {
+        // Refill
+        freeDiamonds = FREE_DIAMONDS_PER_HOUR;
+        lastFreeDiamondsRefill = now;
+        kopRefreshUntil = 0;
+        disabled = false;
+        progress = 0;
+        label = "Kop";
+      }
+    }
+    btnMine.disabled = disabled;
+    btnMine.textContent = label;
+    // Progress bar in button
+    btnMine.style.position = "relative";
+    let progressBar = btnMine.querySelector('.kop-progress');
+    if (!progressBar) {
+      progressBar = document.createElement('div');
+      progressBar.className = 'kop-progress';
+      progressBar.style.position = 'absolute';
+      progressBar.style.left = 0;
+      progressBar.style.top = 0;
+      progressBar.style.height = '100%';
+      progressBar.style.width = '0%';
+      progressBar.style.background = 'rgba(255,255,255,0.18)';
+      progressBar.style.borderRadius = '14px';
+      progressBar.style.pointerEvents = 'none';
+      progressBar.style.transition = 'width 0.2s linear';
+      btnMine.appendChild(progressBar);
+    }
+    progressBar.style.width = Math.round(progress*100) + '%';
+    progressBar.style.display = disabled ? 'block' : 'none';
+  }
+
+  setInterval(updateKopButtonState, 200);
+
   btnMine.onclick = () => {
-    const gain = 1;
-    playerDiamonds += gain;
-    updateDiamondsDisplay();
-    saveGame();
-    try {
-      const startRect = btnMine.getBoundingClientRect();
-      const endRect = playerDiamondsSpan.getBoundingClientRect();
-      spawnDiamondSprites(startRect, endRect, 1, 400);
-    } catch {}
+    const now = Date.now();
+    refillFreeDiamondsIfNeeded();
+    if (kopDelayUntil > now || (freeDiamonds <= 0 && kopRefreshUntil > now)) return;
+    if (freeDiamonds > 0) {
+      // Losowo od 1 do 10 diamentów
+      const diamondsToAdd = Math.min(freeDiamonds, Math.floor(Math.random() * 10) + 1);
+      playerDiamonds += diamondsToAdd;
+      freeDiamonds -= diamondsToAdd;
+      kopDelayUntil = now + FREE_DIAMONDS_DELAY;
+      updateDiamondsDisplay();
+      saveGame();
+      try {
+        const startRect = btnMine.getBoundingClientRect();
+        const endRect = playerDiamondsSpan.getBoundingClientRect();
+        spawnDiamondSprites(startRect, endRect, diamondsToAdd, 400);
+      } catch {}
+      if (freeDiamonds <= 0) {
+        kopRefreshUntil = now + REFRESH_DELAY;
+      }
+    }
+    updateKopButtonState();
   };
 
   window.addEventListener('resize', () => {
