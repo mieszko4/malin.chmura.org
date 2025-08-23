@@ -86,15 +86,15 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 200px;
-  max-width: 220px;
+  min-width: 100px;
+  max-width: 160px;
   flex-shrink: 0;
   word-break: break-word;
   font-weight: 700;
 }
 
 .hero-icon { font-size: 2.3rem; flex-shrink: 0; }
-.hero-name { font-size: 0.85rem; line-height: 1.2; word-wrap: break-word; }
+.hero-name { font-size: 0.75rem; line-height: 1.2; word-wrap: break-word; }
 
 /* Wiadro na diamenty pomiędzy bohaterem a korytarzem */
 .bucket { min-width: 64px; display:flex; flex-direction:column; align-items:center; gap:4px; flex-shrink:0; cursor: pointer; }
