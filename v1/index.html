@@ -758,6 +758,17 @@
       if (i === 0) {
         // Korytarz 0 - platforma rozładunkowa po lewej + kurierzy w środku + sejf po prawej
         
+                        // Kontener transportu
+                const transportContainer = document.createElement("div");
+                transportContainer.style.position = "absolute";
+                transportContainer.style.left = "0";
+                transportContainer.style.top = "0";
+                transportContainer.style.width = "100%";
+                transportContainer.style.height = "100%";
+                transportContainer.style.zIndex = "1";
+                transportContainer.style.outline = "2px solid #ffff00";
+                transportContainer.style.outlineOffset = "1px";
+        
         // Platforma rozładunkowa po lewej stronie
         const unloadingPlatform = document.createElement("div");
         unloadingPlatform.className = "unloading-platform";
@@ -766,7 +777,7 @@
           <div class="platform-label">Platforma</div>
           <div class="platform-diamonds">${formatNumber(transportDiamonds)}</div>
         `;
-        corridorEl.appendChild(unloadingPlatform);
+        transportContainer.appendChild(unloadingPlatform);
 
         // Kurierzy w środku
         if (kurierzyTeam.length > 0) {
@@ -806,7 +817,7 @@
               showKurierPopup(kurier);
             };
             
-            corridorEl.appendChild(kurierEl);
+            transportContainer.appendChild(kurierEl);
           });
         } else {
           // Pokaż informację o braku kurierów
@@ -818,7 +829,7 @@
               <div>Kup kuriera aby transportować diamenty</div>
             </div>
           `;
-          corridorEl.appendChild(noKurierInfo);
+          transportContainer.appendChild(noKurierInfo);
         }
 
         // Sejf po prawej stronie
@@ -840,7 +851,12 @@
             renderTeam();
           }
         };
-        corridorEl.appendChild(safeEl);
+        
+        // Dodaj sejf do kontenera transportu
+        transportContainer.appendChild(safeEl);
+        
+        // Dodaj kontener transportu do korytarza
+        corridorEl.appendChild(transportContainer);
       } else {
         // Prawdziwy korytarz z ścianą do kopania
         const wall = document.createElement("div");
@@ -1283,6 +1299,10 @@
     if (corridors.length === 0) {
       addNewCorridor();
     }
+    // Upewnij się, że mamy korytarz 1 dla domyślnego kopacza
+    if (corridors.length === 1) {
+      addNewCorridor();
+    }
   }
 
   function updateTransportSystem(dt) {
@@ -1394,17 +1414,48 @@
     if (kurierEl) {
         let leftPosition;
         
-        if (kurier.state === "loading" || kurier.state === "unloading") {
-            if (kurier.target === "platform") {
-                leftPosition = 120;
-            } else if (kurier.target === "safe") {
-                leftPosition = window.innerWidth - 120 - 60;
+        // Dynamicznie określ pozycje platformy i sejfu
+        const platformEl = document.querySelector('.unloading-platform');
+        const safeEl = document.querySelector('.safe');
+        
+        if (platformEl && safeEl) {
+            const platformRect = platformEl.getBoundingClientRect();
+            const safeRect = safeEl.getBoundingClientRect();
+            
+            // Prawa krawędź platformy
+            const platformRightEdge = platformRect.right;
+            // Lewa krawędź sejfu
+            const safeLeftEdge = safeRect.left;
+            // Obszar ruchu kuriera - uwzględniam szerokość kuriera (60px) aby nie nachodził na platformę ani sejf
+            const movementArea = (safeLeftEdge - 60) - (platformRightEdge - 60);
+            
+            if (kurier.state === "loading" || kurier.state === "unloading") {
+                if (kurier.target === "platform") {
+                    leftPosition = platformRightEdge - 60; // Pozycja przy platformie
+                } else if (kurier.target === "safe") {
+                    leftPosition = safeLeftEdge - 60; // Pozycja przy sejfie - uwzględniam szerokość kuriera
+                }
+            } else if (kurier.state === "moving") {
+                if (kurier.direction === "right") {
+                    leftPosition = platformRightEdge - 60 + (kurier.progress * movementArea);
+                } else {
+                    leftPosition = safeLeftEdge - 60 - (kurier.progress * movementArea); // Uwzględniam szerokość kuriera
+                }
             }
-        } else if (kurier.state === "moving") {
-            if (kurier.direction === "right") {
-                leftPosition = 120 + (kurier.progress * (window.innerWidth - 240 - 60));
-            } else {
-                leftPosition = window.innerWidth - 120 - 60 - (kurier.progress * (window.innerWidth - 240 - 60));
+        } else {
+            // Fallback do starych wartości jeśli elementy nie są dostępne
+            if (kurier.state === "loading" || kurier.state === "unloading") {
+                if (kurier.target === "platform") {
+                    leftPosition = 120;
+                } else if (kurier.target === "safe") {
+                    leftPosition = window.innerWidth - 120 - 60;
+                }
+            } else if (kurier.state === "moving") {
+                if (kurier.direction === "right") {
+                    leftPosition = 120 + (kurier.progress * (window.innerWidth - 240 - 60));
+                } else {
+                    leftPosition = window.innerWidth - 120 - 60 - (kurier.progress * (window.innerWidth - 240 - 60));
+                }
             }
         }
         
@@ -2268,11 +2319,11 @@
     if (!team.some(h => h)) {
       // Upewnij się, że mamy pierwszy korytarz
       initializeFirstCorridor();
-      team[0] = createHeroInstance(heroesData[0]); // Użyj danych z heroes.json
+      team[1] = createHeroInstance(heroesData[0]); // Użyj danych z heroes.json - kopacz w korytarzu 1
 
       // Ustaw pojemność wiadra na 10x Strength nowego bohatera
-      const newBucketCapacity = (team[0].strength || 1) * 10;
-      corridors[0].bucketCapacity = newBucketCapacity;
+      const newBucketCapacity = (team[1].strength || 1) * 10;
+      corridors[1].bucketCapacity = newBucketCapacity;
     }
     // Upewnij się, że mamy pierwszy korytarz
     initializeFirstCorridor();

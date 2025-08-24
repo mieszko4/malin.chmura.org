@@ -733,6 +733,8 @@ button#btn-mine:disabled .free-diamonds-label {
 
 /* Styling dla sejfu */
 .safe {
+  width: 120px;
+  flex-shrink: 0;
   background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
   border: 2px solid #daa520;
   border-radius: 8px;
@@ -748,27 +750,39 @@ button#btn-mine:disabled .free-diamonds-label {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  /* DEBUG: Zielona otoczka */
+  outline: 3px solid #00ff00;
+  outline-offset: 2px;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
 }
 
 /* Platforma rozładunkowa */
-.unloading-platform {
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 120px;
-    z-index: 5;
-    background: linear-gradient(135deg, #8B4513, #A0522D);
-    border: 3px solid #654321;
-    border-radius: 10px;
-    padding: 15px;
-    text-align: center;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-    color: white;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background 0.3s ease, box-shadow 0.3s ease;
-}
+.unloading-platform { 
+  width: 120px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #8B4513, #A0522D);
+  border: 3px solid #654321;
+  border-radius: 10px;
+  padding: 15px;
+  text-align: center;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+  /* DEBUG: Czerwona otoczka */
+  outline: 3px solid #ff0000;
+  outline-offset: 2px;
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+} 
 
 .unloading-platform:hover {
     background: linear-gradient(135deg, #A0522D, #CD853F);
@@ -851,7 +865,11 @@ button#btn-mine:disabled .free-diamonds-label {
 }
 
 .no-kurier-info {
-  flex: 1;
+  position: absolute;
+  left: 120px;
+  right: 140px;
+  top: 50%;
+  transform: translateY(-50%);
   text-align: center;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 6px;
@@ -859,11 +877,16 @@ button#btn-mine:disabled .free-diamonds-label {
   border: 1px dashed rgba(255, 255, 255, 0.2);
   color: #999;
   font-size: 0.8rem;
+  box-sizing: border-box; /* Uwzględnij padding i border w szerokości */
+  /* DEBUG: Niebieska otoczka */
+  outline: 3px solid #ff00ea;
+  outline-offset: 2px;
+  z-index: 37;
 }
 
 .platform-counter {
-    font-size: 18px;
+    font-size: 118px;
     margin-top: 10px;
-    color: #FFD700;
+    color: #00aeff;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
 }
