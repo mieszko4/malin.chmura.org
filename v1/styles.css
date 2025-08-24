@@ -59,7 +59,7 @@ body {
 
 /* Drużyna / korytarze */
 #team {
-  width: 80%;
+  width: 90%;
   margin: 0;
   padding: 0;
   display: flex;
@@ -742,7 +742,7 @@ button#btn-mine:disabled .free-diamonds-label {
   text-align: center;
   color: #8b4513;
   font-weight: bold;
-  font-size: 0.9rem;
+  font-size: 5.9rem;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   margin: 0;
   height: 48px;
@@ -826,8 +826,14 @@ button#btn-mine:disabled .free-diamonds-label {
 }
 
 /* Liczniki diamentów */
-.platform-diamonds, .safe-diamonds, .transport-load {
+.platform-diamonds, .transport-load {
   font-size: 0.6rem;
+  color: #06d6a0;
+  font-weight: bold;
+}
+
+.safe-diamonds {
+  font-size: 0.9rem;
   color: #06d6a0;
   font-weight: bold;
   margin-top: 2px;

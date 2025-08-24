@@ -216,7 +216,7 @@
 
   let heroesData = [];
   let toolsData = [];
-  let playerDiamonds = 0;
+  // playerDiamonds usunięte - teraz używamy safeDiamonds jako głównego magazynu
   const maxTeamSize = 12;
   let corridors = []; // Będzie dynamicznie rozszerzane
   let team = []; // Będzie dynamicznie rozszerzane
@@ -388,7 +388,7 @@
   }
 
   function updateDiamondsDisplay() {
-    playerDiamondsSpan.textContent = `💎 Diamenty: ${formatNumber(playerDiamonds)}`;
+    playerDiamondsSpan.textContent = `💎 Diamenty: ${formatNumber(safeDiamonds)}`;
     checkElevatorEnabled();
   }
   
@@ -736,9 +736,9 @@
           e.preventDefault();
           const amt = corridor.bucketAmount || 0;
           if (amt <= 0) return;
-          playerDiamonds += amt;
+          transportDiamonds += amt;
           corridor.bucketAmount = 0;
-          updateDiamondsDisplay();
+          updatePlatformCounter(); // Aktualizuj licznik platformy
           saveGame();
           renderTeam();
         });
@@ -774,14 +774,16 @@
         unloadingPlatform.onclick = function() {
             console.log('=== KLIKNIĘTO PLATFORMĘ ===');
             
-            if (gameState.platformDiamonds > 0) {
-                const amount = gameState.platformDiamonds;
+            if (transportDiamonds > 0) {
+                const amount = transportDiamonds;
                 
-                gameState.platformDiamonds = 0;
-                gameState.diamonds += amount;
+                transportDiamonds = 0;
+                safeDiamonds += amount; // Diamenty idą do sejfu, nie bezpośrednio do gracza
                 
                 updatePlatformCounter();
-                updateDiamondDisplay();
+                updateSafeDisplay(); // Aktualizuj wyświetlanie sejfu
+                
+                console.log(`Przeniesiono ${amount} diamentów z platformy do sejfu. Sejf ma teraz: ${safeDiamonds}`);
                 
                 // Animacja (opcjonalna)
                 const platformEl = document.querySelector('.unloading-platform');
@@ -791,6 +793,8 @@
                     const endRect = safeEl.getBoundingClientRect();
                     spawnDiamondSprites(startRect, endRect, amount, 1000);
                 }
+                
+                saveGame(); // Zapisz stan gry
             } else {
                 console.log('Platforma jest pusta');
             }
@@ -857,17 +861,7 @@
           <div class="safe-label">Sejf</div>
           <div class="safe-diamonds">${formatNumber(safeDiamonds)}</div>
         `;
-        safeEl.style.cursor = "pointer";
-        safeEl.title = "Kliknij aby pobrać diamenty";
-        safeEl.onclick = () => {
-          if (safeDiamonds > 0) {
-            playerDiamonds += safeDiamonds;
-            safeDiamonds = 0;
-            updateDiamondsDisplay();
-            saveGame();
-            renderTeam();
-          }
-        };
+        // Sejf jest teraz głównym magazynem diamentów - nie ma kliknięcia
         
         // Dodaj sejf do korytarza
         corridorEl.appendChild(safeEl);
@@ -1218,11 +1212,11 @@
     popupAction.textContent = isUpgrade ? "Ulepsz" : "Kup";
 
     popupAction.onclick = () => {
-      if (playerDiamonds < cost) {
+      if (safeDiamonds < cost) {
         alert("Za mało diamentów.");
         return;
       }
-      playerDiamonds -= cost;
+      safeDiamonds -= cost;
 
       if (isUpgrade) {
         // Logika ulepszania istniejącego bohatera
@@ -1246,7 +1240,7 @@
           // Jeśli nie ma wolnego miejsca, dodaj nowy korytarz
           if (corridors.length >= maxTeamSize) {
             alert("Osiągnięto maksymalną liczbę korytarzy.");
-            playerDiamonds += cost; // Zwróć diamenty
+            safeDiamonds += cost; // Zwróć diamenty
             return;
           }
 
@@ -1255,7 +1249,7 @@
             freeSlotIndex = team.length - 1;
           } else {
             alert("Nie udało się dodać nowego korytarza.");
-            playerDiamonds += cost;
+            safeDiamonds += cost;
             return;
           }
         }
@@ -1323,6 +1317,8 @@
     console.log("updateTransportSystem wywołane, dt:", dt);
     console.log("kurierzyTeam:", kurierzyTeam);
     console.log("kurierzyPurchased:", kurierzyPurchased);
+    console.log("transportDiamonds:", transportDiamonds);
+    console.log("safeDiamonds:", safeDiamonds);
     
     // Sprawdź czy są kupione kurierzy
     Object.entries(kurierzyPurchased).forEach(([id, count]) => {
@@ -1353,8 +1349,8 @@
     // Logika stanów kuriera
     switch (kurier.state) {
         case "idle":
-            console.log(`Kurier ${kurier.id}: Sprawdzam czy są diamenty na platformie: ${gameState.platformDiamonds}`);
-            if (gameState.platformDiamonds > 0) {
+            console.log(`Kurier ${kurier.id}: Sprawdzam czy są diamenty na platformie: ${transportDiamonds}`);
+            if (transportDiamonds > 0) {
                 console.log(`Kurier ${kurier.id}: Przechodzę do stanu moving, target=platform`);
                 kurier.state = "moving";
                 kurier.target = "platform";
@@ -1392,10 +1388,10 @@
             
         case "loading":
             console.log(`Kurier ${kurier.id}: Ładuję diamenty z platformy`);
-            const loadAmount = Math.min(gameState.platformDiamonds, kurier.capacity);
-            console.log(`Kurier ${kurier.id}: loadAmount=${loadAmount}, platformDiamonds=${gameState.platformDiamonds}, capacity=${kurier.capacity}`);
+            const loadAmount = Math.min(transportDiamonds, kurier.capacity);
+            console.log(`Kurier ${kurier.id}: loadAmount=${loadAmount}, platformDiamonds=${transportDiamonds}, capacity=${kurier.capacity}`);
             if (loadAmount > 0) {
-                gameState.platformDiamonds -= loadAmount;
+                transportDiamonds -= loadAmount;
                 kurier.carried = loadAmount;
                 console.log(`Kurier ${kurier.id}: Załadowano ${loadAmount} diamentów, przechodzę do sejfu`);
                 kurier.state = "moving";
@@ -1409,13 +1405,15 @@
         case "unloading":
             console.log(`Kurier ${kurier.id}: Rozładowuję diamenty do sejfu, carried=${kurier.carried}`);
             if (kurier.carried > 0) {
-                gameState.diamonds += kurier.carried;
-                console.log(`Kurier ${kurier.id}: Rozładowano ${kurier.carried} diamentów do sejfu`);
+                safeDiamonds += kurier.carried;
+                console.log(`Kurier ${kurier.id}: Rozładowano ${kurier.carried} diamentów do sejfu, safeDiamonds teraz: ${safeDiamonds}`);
                 kurier.carried = 0;
                 kurier.state = "moving";
                 kurier.target = "platform";
                 kurier.direction = "left";
                 kurier.progress = 0;
+                updateSafeDisplay(); // Odśwież wyświetlanie sejfu
+                saveGame(); // Zapisz stan gry
             }
             break;
             
@@ -1526,12 +1524,12 @@
     popupAction.textContent = "Kup";
 
     popupAction.onclick = () => {
-      if (playerDiamonds < wz.cost) {
+      if (safeDiamonds < wz.cost) {
         alert("Za mało diamentów na zakup windziarza.");
         return;
       }
       
-      playerDiamonds -= wz.cost;
+      safeDiamonds -= wz.cost;
       windziarzTeam = [createWindziarzInstance(wz)];
       windziarzPurchased = true;
       updateDiamondsDisplay();
@@ -1559,12 +1557,12 @@
     popupAction.textContent = "Kup";
 
     popupAction.onclick = () => {
-      if (playerDiamonds < kurierData.cost) {
+      if (safeDiamonds < kurierData.cost) {
         alert("Za mało diamentów na zakup kuriera.");
         return;
       }
       
-      playerDiamonds -= kurierData.cost;
+      safeDiamonds -= kurierData.cost;
       kurierzyPurchased[kurierData.id] = (kurierzyPurchased[kurierData.id] || 0) + 1;
       
       // Dodaj kuriera do teamu
@@ -1574,11 +1572,15 @@
       console.log("kurierzyTeam po dodaniu:", kurierzyTeam);
       
       // Zaktualizuj wyświetlanie
-      updateDiamondDisplay();
+      updateDiamondsDisplay();
       renderKurierzyShop();
       
       // Przerenderuj korytarz 0 żeby pokazać nowego kuriera
-      renderCorridor(0);
+      renderTeam();
+      
+      // Zamknij popup
+      popup.style.display = "none";
+      saveGame();
     };
 
     popup.style.display = "flex";
@@ -1663,7 +1665,7 @@
       item.appendChild(cost);
 
       item.onclick = () => {
-        if (playerDiamonds < tool.cost) {
+        if (safeDiamonds < tool.cost) {
           alert("Za mało diamentów na zakup.");
           return;
         }
@@ -1671,7 +1673,7 @@
           alert("Już masz to narzędzie.");
           return;
         }
-        playerDiamonds -= tool.cost;
+        safeDiamonds -= tool.cost;
         updateDiamondsDisplay();
         equippedTools.push({ ...tool, durability: 100 });
         updateMiningBoost();
@@ -1839,7 +1841,7 @@
   function saveGame() {
     try {
       const state = { 
-        playerDiamonds, 
+        // playerDiamonds usunięte - używamy safeDiamonds
         team, 
         corridors, 
         equippedTools, 
@@ -1851,7 +1853,7 @@
         safeDiamonds
       };
       localStorage.setItem("diamondMineGameState", JSON.stringify(state));
-      localStorage.setItem('platformDiamonds', gameState.platformDiamonds || 0);
+      localStorage.setItem('platformDiamonds', transportDiamonds || 0);
     } catch (e) {
       console.warn("Błąd zapisu stanu gry", e);
     }
@@ -1889,7 +1891,8 @@
   }
 
   function checkElevatorEnabled() {
-    const shouldBeEnabled = Number(playerDiamonds) >= Number(graConfig.liftAfterCollectionOf) || windziarzPurchased;
+    const shouldBeEnabled = Number(safeDiamonds) >= Number(graConfig.liftAfterCollectionOf) || windziarzPurchased;
+    // Debug: console.log(`checkElevatorEnabled: safeDiamonds=${safeDiamonds}, required=${graConfig.liftAfterCollectionOf}, windziarzPurchased=${windziarzPurchased}, shouldBeEnabled=${shouldBeEnabled}, elevatorEnabled=${elevatorEnabled}`);
     if (shouldBeEnabled && !elevatorEnabled) {
       elevatorEnabled = true;
       const windziarzeShop = document.getElementById("windziarze-shop");
@@ -1981,8 +1984,8 @@
     }
     const kurierzyList = document.getElementById("kurierzy-list");
     kurierzyList.innerHTML = "";
-    shopSection.style.display = elevatorEnabled ? "block" : "none";
-    if (!elevatorEnabled) return;
+    shopSection.style.display = "block"; // Kurierzy zawsze dostępni
+    console.log(`renderKurierzyShop: kurierzyData.length=${kurierzyData.length}`);
     for (const kurierBase of kurierzyData) {
       const item = document.createElement("div");
       item.className = "shop-item";
@@ -2284,7 +2287,7 @@
     if (savedState) {
       try {
         const state = JSON.parse(savedState);
-        playerDiamonds = state.playerDiamonds ?? 0;
+        // playerDiamonds jest przestarzałe - używamy safeDiamonds
         if (state.corridors && state.team) {
           for (let i = 0; i < state.corridors.length; i++) {
             const sc = state.corridors[i];
@@ -2502,19 +2505,30 @@
     if (freeDiamonds > 0) {
       // Losowo od 1 do 10 diamentów
       const diamondsToAdd = Math.min(freeDiamonds, Math.floor(Math.random() * 10) + 1);
-      playerDiamonds += diamondsToAdd;
+      transportDiamonds += diamondsToAdd;
       freeDiamonds -= diamondsToAdd;
       kopDelayUntil = now + FREE_DIAMONDS_DELAY;
-      updateDiamondsDisplay();
+      updatePlatformCounter(); // Aktualizuj licznik platformy
+      // NIE wywołujemy updateDiamondsDisplay() - licznik "Diamenty" się nie zmienia dopóki nie klikniesz platformy
       saveGame();
       
       try {
         const startRect = btnMine.getBoundingClientRect();
-        const endRect = playerDiamondsSpan.getBoundingClientRect();
-        
-        // Wyślij dokładnie tyle diamentów ile zostało wygenerowane
-        spawnDiamondSprites(startRect, endRect, diamondsToAdd, 400);
-      } catch {}
+        const platformEl = document.querySelector('.unloading-platform');
+        if (platformEl) {
+          const endRect = platformEl.getBoundingClientRect();
+          console.log('Kop: Animacja leci do platformy');
+          // Wyślij dokładnie tyle diamentów ile zostało wygenerowane - do platformy
+          spawnDiamondSprites(startRect, endRect, diamondsToAdd, 400);
+        } else {
+          console.log('Kop: Platforma nie znaleziona - brak animacji');
+          // Sprawdź czy korytarz 0 istnieje
+          console.log('Corridors:', corridors.length);
+          console.log('Team:', team.length);
+        }
+      } catch (e) {
+        console.log('Kop: Błąd animacji:', e);
+      }
       
       if (freeDiamonds <= 0) {
         kopRefreshUntil = now + REFRESH_DELAY;
@@ -2590,10 +2604,7 @@
         corridor.bucketAmount = 0;
         
         // Przenieś diamenty do platformy (nie do sejfu)
-        if (!gameState.platformDiamonds) {
-            gameState.platformDiamonds = 0;
-        }
-        gameState.platformDiamonds += amount;
+        transportDiamonds += amount;
         
         // Zaktualizuj licznik platformy
         updatePlatformCounter();
@@ -2619,7 +2630,19 @@
   function updatePlatformCounter() {
     const counterEl = document.querySelector('.platform-counter');
     if (counterEl) {
-        counterEl.textContent = `Diamenty: ${gameState.platformDiamonds || 0}`;
+        counterEl.textContent = `Diamenty: ${transportDiamonds || 0}`;
+    }
+    // Aktualizuj także wyświetlanie na platformie
+    const platformDiamondsEl = document.querySelector('.platform-diamonds');
+    if (platformDiamondsEl) {
+        platformDiamondsEl.textContent = formatNumber(transportDiamonds);
+    }
+  }
+
+  function updateSafeDisplay() {
+    const safeDiamondsEl = document.querySelector('.safe-diamonds');
+    if (safeDiamondsEl) {
+        safeDiamondsEl.textContent = formatNumber(safeDiamonds);
     }
   }
 
@@ -2652,64 +2675,10 @@
 
   // ... existing code ...
   // W funkcji renderCorridor, na początku
-  function renderCorridor(corridorIndex) {
-      if (corridorIndex === 0) {
-          // Tylko w razie problemów
-          // console.log("To jest korytarz 0 - powinienem renderować kurierzy");
-      }
-      
-      // ... existing code ...
-  }
+  // renderCorridor usunięte - używamy renderTeam()
   // ... existing code ...
 
-  // W funkcji renderowania korytarza 0, gdzie tworzona jest platforma
-  const unloadingPlatform = document.createElement('div');
-  unloadingPlatform.className = 'unloading-platform';
-  unloadingPlatform.innerHTML = `
-      <div>Platforma</div>
-      <div>Rozładunku</div>
-      <div class="platform-counter">Diamenty: ${gameState.platformDiamonds || 0}</div>
-  `;
-
-  // Delegacja eventu dla platformy rozładunkowej
-  if (i === 0) {
-    corridorEl.addEventListener('click', function(event) {
-      const platform = event.target.closest('.unloading-platform');
-      if (platform) {
-        // alert('Kliknięto platformę przez delegację!'); // Prosty test
-        console.log('=== KLIKNIĘTO PLATFORMĘ (DELEGACJA) ===');
-        
-        if (gameState.platformDiamonds > 0) {
-            const amount = gameState.platformDiamonds;
-            console.log(`Przenoszę ${amount} diamentów z platformy do sejfu`);
-            
-            gameState.platformDiamonds = 0;
-            gameState.diamonds += amount;
-            
-            updatePlatformCounter();
-            updateDiamondDisplay();
-            
-            const platformEl = document.querySelector('.unloading-platform');
-            const safeEl = document.querySelector('.safe');
-            
-            if (platformEl && safeEl && typeof spawnDiamondSprites === 'function') {
-                const startRect = platformEl.getBoundingClientRect();
-                const endRect = safeEl.getBoundingClientRect();
-                spawnDiamondSprites(startRect, endRect, amount, 1000);
-            }
-        } else {
-            console.log('Platforma jest pusta');
-        }
-      }
-    });
-  }
-
-  // Dodaj cursor pointer do platformy
-  unloadingPlatform.style.pointerEvents = 'auto';
-
-  // Dodaj platformę do korytarza
-  corridorEl.appendChild(unloadingPlatform);
-  console.log('Platforma dodana do korytarza, element:', unloadingPlatform);
+  
   // ... existing code ...
 
 })();
