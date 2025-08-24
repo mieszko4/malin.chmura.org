@@ -16,6 +16,12 @@
     z-index: 9999;
     will-change: transform, opacity;
   }
+  
+  /* Optymalizacje dla płynnych animacji kopaczy */
+  .hero-position {
+    transform: translateZ(0); /* Wymusza hardware acceleration */
+    backface-visibility: hidden; /* Optymalizacja renderowania */
+  }
   @keyframes diamond-fly {
     to {
       transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, -120px))) scale(0.6);
@@ -347,9 +353,64 @@
   }
   // --- end animation framework ---
 
+  // Funkcja sprawdzająca czy element jest widoczny
+  function isElementVisible(element) {
+    const rect = element.getBoundingClientRect();
+    return rect.top < window.innerHeight && rect.bottom > 0;
+  }
+
+  // Funkcja aktualizująca tylko pozycję kopacza (dla optymalizacji)
+  function updateHeroPosition(corridorIndex) {
+    const corridorEl = document.querySelector(`[data-corridor-index="${corridorIndex}"]`);
+    if (!corridorEl) return;
+    
+    const hero = team[corridorIndex];
+    if (!hero) return;
+    
+    const heroPos = corridorEl.querySelector('.hero-position');
+    if (!heroPos) return;
+    
+    const corridor = corridors[corridorIndex];
+    const DIST = 100;
+    let progressRatio = 0;
+    
+    if (hero.state === "commuting") progressRatio = Math.min(1, hero.position / 100);
+    else if (hero.state === "mining") {
+      const maxD = corridor.maxDiamonds || 100;
+      const remD = Math.max(0, Math.min(maxD, corridor.remainingDiamonds ?? maxD));
+      const leftRatio = (corridor.wallStart || 0.1) + (1 - remD / maxD) * (1 - (corridor.wallStart || 0.1));
+      progressRatio = leftRatio;
+    }
+    else if (hero.state === "transporting") progressRatio = Math.min(1, hero.position / 100);
+    
+    // Interpolacja pozycji dla płynniejszego ruchu
+    if (!hero._lastRenderPosition) hero._lastRenderPosition = progressRatio;
+    const interpolatedRatio = hero._lastRenderPosition + (progressRatio - hero._lastRenderPosition) * 0.8;
+    hero._lastRenderPosition = interpolatedRatio;
+    
+    heroPos.style.left = `${interpolatedRatio * 100}%`;
+  }
+
+  // Funkcja aktualizująca wszystkie widoczne kopacze
+  function updateVisibleHeroes() {
+    for (let i = 0; i < maxTeamSize; i++) {
+      const corridorEl = document.querySelector(`[data-corridor-index="${i}"]`);
+      if (corridorEl && isElementVisible(corridorEl)) {
+        updateHeroPosition(i);
+      }
+    }
+  }
+
   function renderTeam() {
     teamContainer.innerHTML = "";
     for (let i = 0; i < maxTeamSize; i++) {
+      // Optymalizacja: renderuj tylko widoczne korytarze
+      let existingCorridorEl = document.querySelector(`[data-corridor-index="${i}"]`);
+      if (existingCorridorEl && isElementVisible(existingCorridorEl)) {
+        // Aktualizuj tylko pozycję kopacza dla widocznych elementów
+        updateHeroPosition(i);
+        continue;
+      }
       const corridor = corridors[i];
       const hero = team[i];
       const maxWallHP = corridor.wallHP + 2000;
@@ -523,6 +584,9 @@
         heroPos.style.alignItems = "center";
         heroPos.style.justifyContent = "center";
         heroPos.style.fontSize = "1rem";
+        // Płynne animacje pozycji
+        heroPos.style.transition = "left 0.1s ease-out";
+        heroPos.style.willChange = "left";
 
         const icon = document.createElement("div");
         icon.textContent = hero.icon;
@@ -553,7 +617,13 @@
           if (hero.state === "commuting") progressRatio = Math.min(1, hero.position / 100);
           else if (hero.state === "mining") progressRatio = leftRatio; // podczas kopania stoi przy ścianie
           else if (hero.state === "transporting") progressRatio = Math.min(1, hero.position / 100);
-          heroPos.style.left = `${progressRatio * 100}%`;
+          
+          // Interpolacja pozycji dla płynniejszego ruchu
+          if (!hero._lastRenderPosition) hero._lastRenderPosition = progressRatio;
+          const interpolatedRatio = hero._lastRenderPosition + (progressRatio - hero._lastRenderPosition) * 0.8;
+          hero._lastRenderPosition = interpolatedRatio;
+          
+          heroPos.style.left = `${interpolatedRatio * 100}%`;
         }
 
         wall.appendChild(heroPos);
@@ -1350,13 +1420,25 @@
 
   let lastTime = performance.now();
   let renderAccum = 0;
-  const RENDER_INTERVAL = 0.18; // sekundy (ok. 5-6 FPS dla UI)
+  let heroRenderAccum = 0;
+  const RENDER_INTERVAL = 0.016; // sekundy (60 FPS dla płynnego UI)
+  const HERO_RENDER_INTERVAL = 0.008; // sekundy (120 FPS dla kopaczy)
+  
   function loop() {
     const now = performance.now();
     const delta = (now - lastTime) / 1000;
     lastTime = now;
     gameLoopStep(delta);
     windziarzGameLoop(delta);
+    
+    // Renderowanie kopaczy z wyższą częstotliwością
+    heroRenderAccum += delta;
+    if (heroRenderAccum >= HERO_RENDER_INTERVAL) {
+      updateVisibleHeroes();
+      heroRenderAccum = 0;
+    }
+    
+    // Główne renderowanie UI
     renderAccum += delta;
     if (renderAccum >= RENDER_INTERVAL) {
       const sx = window.scrollX, sy = window.scrollY;
