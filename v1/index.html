@@ -137,6 +137,34 @@
     z-index: 5;
   }
 
+  /* Płynne animacje dla kopaczy */
+  .hero-position {
+    transition: left 0.08s cubic-bezier(0.4, 0.0, 0.2, 1);
+    will-change: left;
+  }
+  
+  /* Płynne animacje dla kurierów - zmniejszone aby uniknąć ghostingu */
+  .kurier {
+    transition: none; /* Domyślnie bez animacji */
+    will-change: left;
+    transform: translateZ(0); /* Wymusza hardware acceleration */
+  }
+  
+  /* Animacje włączone tylko gdy kurier się porusza */
+  .kurier.moving {
+    transition: left 0.015s linear;
+  }
+  
+  /* Wyłącz animacje dla szybkich ruchów */
+  .kurier.fast-moving {
+    transition: none;
+  }
+  
+  /* Płynne przejścia dla wszystkich elementów gry */
+  .corridor * {
+    transition: all 0.1s ease-out;
+  }
+
   /* Platforma rozładunkowa */
   .unloading-platform {
     position: absolute;
@@ -293,6 +321,8 @@
       instanceName: base.instanceName || generateHeroName(),
       currentLoad: 0,
       position: 0,
+      _targetPosition: 0, // Dodane dla płynnego ruchu
+      _currentPosition: 0, // Dodane dla płynnego ruchu
       state: "commuting",
       miningProgress: 0,
       unloadTimer: 0,
@@ -330,7 +360,13 @@
       lastLoadingTime: 0,
       lastUnloadingTime: 0,
       loadingTimer: 0, // Timer dla ładowania
-      unloadingTimer: 0 // Timer dla rozładunku
+      unloadingTimer: 0, // Timer dla rozładunku
+      progress: 0, // Postęp ruchu (0-1)
+      target: "platform", // Cel ruchu: "platform" lub "safe"
+      direction: "left", // Kierunek ruchu: "left" lub "right"
+      capacity: kurierBase.capacity || 1000, // Pojemność kuriera
+      speed: kurierBase.speed || 1.0, // Prędkość kuriera
+      loadingspeed: kurierBase.loadingspeed || 50 // Szybkość ładowania
     };
   }
 
@@ -1335,7 +1371,9 @@
     }
     
     // Aktualizuj kurierów
+    console.log(`updateTransportSystem: kurierzyTeam.length=${kurierzyTeam.length}, transportDiamonds=${transportDiamonds}`);
     kurierzyTeam.forEach((kurier, index) => {
+        console.log(`Kurier ${kurier.id}: state=${kurier.state}, progress=${kurier.progress}, target=${kurier.target}`);
         updateKurier(kurier, dt);
     });
     
@@ -1350,11 +1388,15 @@
     }
 
     // Logika stanów kuriera
+    console.log(`Kurier ${kurier.id}: Rozpoczynam updateKurier, state=${kurier.state}, progress=${kurier.progress}, target=${kurier.target}`);
+    
     switch (kurier.state) {
         case "idle":
             // Sprawdź czy windziarz akurat rozładowuje diamenty
             const windziarzUnloading = windziarzTeam.some(wz => wz.state === "unloading" && wz.unloadingTimer > 0);
             const kurierHasSpace = (kurier.carried || 0) < (kurier.capacity || 1000);
+            
+            console.log(`Kurier ${kurier.id} debug: capacity=${kurier.capacity}, speed=${kurier.speed}, loadingspeed=${kurier.loadingspeed}`);
             
             console.log(`Kurier ${kurier.id} w idle: transportDiamonds=${transportDiamonds}, windziarzUnloading=${windziarzUnloading}, kurierHasSpace=${kurierHasSpace}, carried=${kurier.carried}, capacity=${kurier.capacity}`);
             
@@ -1388,9 +1430,11 @@
             break;
             
         case "moving":
-            // Zmniejszona prędkość dla lepszej widoczności animacji
-            const moveSpeed = (kurier.speed || 1.0) * dt * 0.3; // 30% normalnej prędkości
+            // Zwiększona prędkość dla lepszej widoczności ruchu
+            const moveSpeed = (kurier.speed || 1.0) * dt * 1.0; // Pełna prędkość
             kurier.progress += moveSpeed;
+            
+            console.log(`Kurier ${kurier.id} moving: progress=${kurier.progress.toFixed(3)}, target=${kurier.target}, speed=${moveSpeed.toFixed(3)}`);
             
             if (kurier.progress >= 1.0) {
                 kurier.progress = 1.0;
@@ -1408,7 +1452,7 @@
         case "loading":
             // Jeśli timer nie jest ustawiony, ustaw go
             if (kurier.loadingTimer <= 0) {
-                const loadAmount = Math.min(transportDiamonds, kurier.capacity);
+                const loadAmount = Math.min(transportDiamonds, kurier.capacity || 1000);
                 if (loadAmount > 0) {
                     // Ustaw timer na czas ładowania
                     const loadingSpeed = kurier.loadingspeed || 50;
@@ -1424,7 +1468,7 @@
             
             // Gdy timer dobiegnie końca, zakończ ładowanie
             if (kurier.loadingTimer <= 0) {
-                const loadAmount = Math.min(transportDiamonds, kurier.capacity);
+                const loadAmount = Math.min(transportDiamonds, kurier.capacity || 1000);
                 if (loadAmount > 0) {
                     transportDiamonds -= loadAmount;
                     kurier.carried = loadAmount;
@@ -1480,81 +1524,98 @@
             break;
     }
     
-    // Pozycjonowanie kuriera - tylko w obszarze między platformą a sejfem
-    if (kurierEl) {
-        let leftPosition;
-        
-        // Stałe pozycje dla kurierów w korytarzu 0
-        const PLATFORM_WIDTH = 120;
-        const SAFE_WIDTH = 120;
-        const KURIER_WIDTH = 60;
-        const CORRIDOR_PADDING = 12; // gap z CSS
-        
-        // Obszar ruchu kuriera jest między platformą a sejfem
-        const platformEndPos = PLATFORM_WIDTH + CORRIDOR_PADDING; // 132px
-        
-        // Pozycja sejfu względem korytarza (nie całego okna!)
-        const corridorEl = kurierEl.parentElement;
-        const corridorWidth = corridorEl ? corridorEl.offsetWidth : window.innerWidth;
-        const safeStartPos = corridorWidth - SAFE_WIDTH - CORRIDOR_PADDING; // Pozycja względem korytarza
-        
-        const kurierAreaWidth = safeStartPos - platformEndPos - KURIER_WIDTH;
-        
-        // Jednorazowy debug obliczonych pozycji
-        if (!kurier._positionsLogged) {
-            console.log(`Kurier ${kurier.id} SETUP: corridorWidth=${corridorWidth}, platformEndPos=${platformEndPos}, safeStartPos=${safeStartPos}, kurierAreaWidth=${kurierAreaWidth}`);
-            kurier._positionsLogged = true;
-        }
-        
-        // Pozycje dla różnych stanów
-        switch (kurier.state) {
-            case "idle":
-                // Kurier czeka przy platformie
-                leftPosition = platformEndPos;
-                break;
-                
-            case "loading":
-                // Kurier ładuje przy platformie
-                leftPosition = platformEndPos;
-                break;
-                
-            case "moving":
-                if (kurier.target === "platform") {
-                    // Ruch w lewo - do platformy (od sejfu do platformy)
-                    const safeEndPos = safeStartPos - KURIER_WIDTH;
-                    leftPosition = platformEndPos + ((safeEndPos - platformEndPos) * (1 - kurier.progress));
-                } else if (kurier.target === "safe") {
-                    // Ruch w prawo - do sejfu (od platformy do sejfu)
-                    const safeEndPos = safeStartPos - KURIER_WIDTH;
-                    leftPosition = platformEndPos + ((safeEndPos - platformEndPos) * kurier.progress);
-                }
-                break;
-                
-            case "unloading":
-                // Kurier rozładowuje przy sejfie
-                leftPosition = safeStartPos - KURIER_WIDTH;
-                break;
-                
-            default:
-                leftPosition = platformEndPos;
-                break;
-        }
-        
-        // Ustaw pozycję kuriera z płynną animacją
-        if (leftPosition !== undefined) {
-            // Zapisz poprzednią pozycję w obiekcie kuriera
-            kurier._previousLeft = kurier._currentLeft || leftPosition;
-            kurier._currentLeft = leftPosition;
+            // Pozycjonowanie kuriera - tylko w obszarze między platformą a sejfem
+        if (kurierEl) {
+            let leftPosition;
             
-            // Debug: loguj tylko przy znaczących zmianach pozycji
-            if (Math.abs(leftPosition - kurier._previousLeft) > 10) {
-                console.log(`Kurier ${kurier.id} POZYCJA: ${kurier._previousLeft.toFixed(0)} → ${leftPosition.toFixed(0)}px, stan=${kurier.state}`);
+            // Stałe pozycje dla kurierów w korytarzu 0
+            const PLATFORM_WIDTH = 120;
+            const SAFE_WIDTH = 120;
+            const KURIER_WIDTH = 60;
+            const CORRIDOR_PADDING = 12; // gap z CSS
+            
+            // Obszar ruchu kuriera jest między platformą a sejfem
+            const platformEndPos = PLATFORM_WIDTH + CORRIDOR_PADDING; // 132px
+            
+            // Pozycja sejfu względem korytarza (nie całego okna!)
+            const corridorEl = kurierEl.parentElement;
+            const corridorWidth = corridorEl ? corridorEl.offsetWidth : window.innerWidth;
+            const safeStartPos = corridorWidth - SAFE_WIDTH - CORRIDOR_PADDING; // Pozycja względem korytarza
+            
+            const kurierAreaWidth = safeStartPos - platformEndPos - KURIER_WIDTH;
+            
+            // Jednorazowy debug obliczonych pozycji
+            if (!kurier._positionsLogged) {
+                console.log(`Kurier ${kurier.id} SETUP: corridorWidth=${corridorWidth}, platformEndPos=${platformEndPos}, safeStartPos=${safeStartPos}, kurierAreaWidth=${kurierAreaWidth}`);
+                kurier._positionsLogged = true;
             }
             
-            // Ustaw pozycję bezpośrednio bez animacji CSS
-            kurierEl.style.left = `${leftPosition}px`;
+            // Pozycje dla różnych stanów
+            switch (kurier.state) {
+                case "idle":
+                    // Kurier czeka przy platformie
+                    leftPosition = platformEndPos;
+                    break;
+                    
+                case "loading":
+                    // Kurier ładuje przy platformie
+                    leftPosition = platformEndPos;
+                    break;
+                    
+                case "moving":
+                    if (kurier.target === "platform") {
+                        // Ruch w lewo - do platformy (od sejfu do platformy)
+                        const safeEndPos = safeStartPos - KURIER_WIDTH;
+                        leftPosition = platformEndPos + ((safeEndPos - platformEndPos) * (1 - kurier.progress));
+                    } else if (kurier.target === "safe") {
+                        // Ruch w prawo - do sejfu (od platformy do sejfu)
+                        const safeEndPos = safeStartPos - KURIER_WIDTH;
+                        leftPosition = platformEndPos + ((safeEndPos - platformEndPos) * kurier.progress);
+                    }
+                    break;
+                    
+                case "unloading":
+                    // Kurier rozładowuje przy sejfie
+                    leftPosition = safeStartPos - KURIER_WIDTH;
+                    break;
+                    
+                default:
+                    leftPosition = platformEndPos;
+                    break;
+            }
+            
+            // Ustaw pozycję kuriera z optymalizacją aby uniknąć ghostingu
+            if (leftPosition !== undefined) {
+                // Zapisz poprzednią pozycję w obiekcie kuriera
+                kurier._previousLeft = kurier._currentLeft || leftPosition;
+                kurier._currentLeft = leftPosition;
+                
+                // Aktualizuj pozycję tylko jeśli zmiana jest znacząca (więcej niż 1px)
+                if (Math.abs(leftPosition - kurier._previousLeft) > 1) {
+                    // Debug: loguj tylko przy znaczących zmianach pozycji
+                    if (Math.abs(leftPosition - kurier._previousLeft) > 10) {
+                        console.log(`Kurier ${kurier.id} POZYCJA: ${kurier._previousLeft.toFixed(0)} → ${leftPosition.toFixed(0)}px, stan=${kurier.state}`);
+                    }
+                    
+                    // Dodaj/usuń klasy animacji w zależności od stanu i prędkości ruchu
+                    const movementDistance = Math.abs(leftPosition - kurier._previousLeft);
+                    kurierEl.classList.remove("moving", "fast-moving");
+                    
+                    if (kurier.state === "moving") {
+                        if (movementDistance > 5) {
+                            // Szybki ruch - bez animacji
+                            kurierEl.classList.add("fast-moving");
+                        } else {
+                            // Wolny ruch - z animacją
+                            kurierEl.classList.add("moving");
+                        }
+                    }
+                    
+                    // Ustaw pozycję bezpośrednio
+                    kurierEl.style.left = `${leftPosition}px`;
+                }
+            }
         }
-    }
 }
 
   function destroyCorridor(index) {
@@ -1792,25 +1853,42 @@
       if (!hero) continue;
       const corridor = corridors[i];
       const DIST = 100;
-      const speed = hero.speed * dt * 50;
+      
+      // Płynniejszy ruch - zwiększona prędkość i lepsza interpolacja
+      const speed = hero.speed * dt * 80; // Zwiększona z 50 do 80 dla płynniejszego ruchu
+      
+      // Dodaj płynną interpolację pozycji
+      if (!hero._targetPosition) hero._targetPosition = hero.position || 0;
+      if (!hero._currentPosition) hero._currentPosition = hero.position || 0;
 
       switch (hero.state) {
         case "commuting":
-          hero.position = Math.min(DIST, hero.position + speed);
+          // Płynny ruch do ściany
+          hero._targetPosition = Math.min(DIST, hero._targetPosition + speed);
+          
+          // Interpolacja pozycji dla płynnego ruchu
+          const moveProgress = Math.min(1, dt * 10); // Szybkość interpolacji
+          hero._currentPosition += (hero._targetPosition - hero._currentPosition) * moveProgress;
+          hero.position = hero._currentPosition;
+          
           // oblicz pozycję ściany (w tej samej skali co hero.position [0..100])
           const maxD2 = corridor.maxDiamonds || 100;
           const remD2 = Math.max(0, Math.min(maxD2, corridor.remainingDiamonds ?? maxD2));
           const leftRatio2 = (corridor.wallStart || 0.1) + (1 - remD2 / maxD2) * (1 - (corridor.wallStart || 0.1));
           const targetPos = leftRatio2 * DIST;
-          if (hero.position >= targetPos) {
+          
+          if (hero._targetPosition >= targetPos) {
             hero.state = "mining";
             hero.miningProgress = 0;
             hero.currentLoad = 0;
             hero.justMined = 0;
             // ustaw pozycję bohatera dokładnie przy ścianie
             hero.position = targetPos;
+            hero._targetPosition = targetPos;
+            hero._currentPosition = targetPos;
           }
           break;
+          
         case "mining":
           // odejmuj ilość wykopaną w tej klatce (płynnie)
           const minedFloat = hero.mining * miningBoostMultiplier * dt;
@@ -1832,12 +1910,23 @@
             const maxD3 = corridor.maxDiamonds || 100;
             const remD3 = Math.max(0, Math.min(maxD3, corridor.remainingDiamonds ?? maxD3));
             const leftRatio3 = (corridor.wallStart || 0.1) + (1 - remD3 / maxD3) * (1 - (corridor.wallStart || 0.1));
-            hero.position = Math.round(leftRatio3 * DIST);
+            const wallPos = leftRatio3 * DIST;
+            hero.position = wallPos;
+            hero._targetPosition = wallPos;
+            hero._currentPosition = wallPos;
           }
           break;
+          
         case "transporting":
-          hero.position = Math.max(0, hero.position - speed);
-          if (hero.position <= 0) {
+          // Płynny ruch powrotny
+          hero._targetPosition = Math.max(0, hero._targetPosition - speed);
+          
+          // Interpolacja pozycji dla płynnego ruchu
+          const returnProgress = Math.min(1, dt * 10);
+          hero._currentPosition += (hero._targetPosition - hero._currentPosition) * returnProgress;
+          hero.position = hero._currentPosition;
+          
+          if (hero._targetPosition <= 0) {
             hero.state = "unloading";
             // ustaw czas rozładunku i zainicjuj wewnętrzne liczniki transferu
             const ut = (typeof hero.unloadTime === "number") ? hero.unloadTime : 5 / (hero.strength || 1);
@@ -1859,8 +1948,14 @@
               const durMs = (hero.unloadTimer || 1) * 1000;
               animateTransferInCorridor(i, amountToAnimate, durMs);
             }
+            
+            // Ustaw pozycję na 0
+            hero.position = 0;
+            hero._targetPosition = 0;
+            hero._currentPosition = 0;
           }
           break;
+          
         case "unloading":
           // Odejmuj czas od timera
           if (hero.unloadTimer > 0) {
@@ -1879,11 +1974,14 @@
               hero.state = 'idle';
             }
             hero.position = 0;
+            hero._targetPosition = 0;
+            hero._currentPosition = 0;
             // Wyczyszczenie starych danych o rozładunku
             hero._unloadInitial = undefined;
             hero._unloadRemaining = undefined;
           }
           break;
+          
         case "idle":
           const bucketHasSpace = (corridor.bucketAmount || 0) < (corridor.bucketCapacity || 100);
           if (bucketHasSpace && (hero.currentLoad || 0) > 0) {
@@ -1910,10 +2008,12 @@
           // Jeśli wiadro jest pełne - pozostaw w stanie idle
           break;
       }
+      
       if (hero.state !== "idle" && corridor.remainingDiamonds <= 0 && hero.currentLoad === 0) {
         hero.state = "idle";
       }
     }
+    
     if (diamondsGained > 0) {
       team.forEach(hero => {
         if (!hero) return;
@@ -1930,6 +2030,7 @@
       });
       saveGame();
     }
+    
     // rendering jest teraz dławiony w głównej pętli, aby nie niszczyć elementów klikalnych co klatkę
     windziarzGameLoop(dt);
   }
@@ -2449,12 +2550,8 @@
     console.log("Kurierzy załadowani:", kurierzyData);
     console.log("kurierzyTeam po załadowaniu:", kurierzyTeam);
     
-    // Renderuj korytarze
+    // Renderuj korytarze - usunięte, używamy renderTeam()
     console.log("Rozpoczynam renderowanie korytarzy");
-    corridors.forEach((corridor, index) => {
-        console.log(`Renderuję korytarz ${index}`);
-        renderCorridor(index);
-    });
     
     await loadNames();
     heroesData = await loadJSON("heroes.json", defaultHeroesData);
@@ -2483,6 +2580,16 @@
               team[i].instanceName = generateHeroName();
             }
             
+            // Dodaj właściwości dla płynnego ruchu jeśli ich brakuje
+            if (team[i]) {
+              if (typeof team[i]._targetPosition === 'undefined') {
+                team[i]._targetPosition = team[i].position || 0;
+              }
+              if (typeof team[i]._currentPosition === 'undefined') {
+                team[i]._currentPosition = team[i].position || 0;
+              }
+            }
+            
             // Jeśli korytarz ma bohatera, ustaw pojemność wiadra na 10x Strength
             if (team[i]) {
               corridors[i].bucketCapacity = (team[i].strength || 1) * 10;
@@ -2497,6 +2604,22 @@
         kurierzyTeam = (state.kurierzyTeam || []).map(k => ({ ...k }));
         kurierzyPurchased = state.kurierzyPurchased || {};
         
+        // Upewnij się, że kurierzy mają wszystkie potrzebne właściwości
+        kurierzyTeam.forEach(kurier => {
+          if (kurier) {
+            if (typeof kurier.progress === 'undefined') kurier.progress = 0;
+            if (typeof kurier.target === 'undefined') kurier.target = "platform";
+            if (typeof kurier.direction === 'undefined') kurier.direction = "left";
+            if (typeof kurier.carried === 'undefined') kurier.carried = 0;
+            if (typeof kurier.currentLoad === 'undefined') kurier.currentLoad = 0;
+            if (typeof kurier.loadingTimer === 'undefined') kurier.loadingTimer = 0;
+            if (typeof kurier.unloadingTimer === 'undefined') kurier.unloadingTimer = 0;
+            if (typeof kurier.capacity === 'undefined') kurier.capacity = 1000;
+            if (typeof kurier.speed === 'undefined') kurier.speed = 1.0;
+            if (typeof kurier.loadingspeed === 'undefined') kurier.loadingspeed = 50;
+          }
+        });
+        
         // Wczytaj system transportu
         transportDiamonds = state.transportDiamonds || 0;
         safeDiamonds = state.safeDiamonds || 0;
@@ -2509,6 +2632,7 @@
       // Nowa gra: nie ma zapisanego stanu, więc zaczynamy z pustymi tablicami
       // Pierwszy korytarz zostanie dodany przez initializeFirstCorridor()
     }
+    
     // Dodaj domyślnego bohatera tylko jeśli nie istnieje
     if (!team.some(h => h)) {
       // Upewnij się, że mamy pierwszy korytarz
@@ -2519,6 +2643,19 @@
       const newBucketCapacity = (team[1].strength || 1) * 10;
       corridors[1].bucketCapacity = newBucketCapacity;
     }
+    
+    // Upewnij się, że wszyscy bohaterowie mają właściwości dla płynnego ruchu
+    team.forEach(hero => {
+      if (hero) {
+        if (typeof hero._targetPosition === 'undefined') {
+          hero._targetPosition = hero.position || 0;
+        }
+        if (typeof hero._currentPosition === 'undefined') {
+          hero._currentPosition = hero.position || 0;
+        }
+      }
+    });
+    
     // Upewnij się, że mamy pierwszy korytarz
     initializeFirstCorridor();
     
@@ -2535,13 +2672,21 @@
 
   let lastTime = performance.now();
   let renderAccum = 0;
-  const RENDER_INTERVAL = 0.18; // sekundy (ok. 5-6 FPS dla UI)
+  const RENDER_INTERVAL = 0.05; // sekundy (20 FPS dla płynnego ruchu kopaczy)
   function loop() {
     const now = performance.now();
     const delta = (now - lastTime) / 1000;
     lastTime = now;
     gameLoopStep(delta);
-    updateTransportSystem(delta);
+    
+    // Aktualizuj system transportu rzadziej aby uniknąć ghostingu
+    if (!window.transportAccum) window.transportAccum = 0;
+    window.transportAccum += delta;
+    if (window.transportAccum >= 0.05) { // 20 FPS dla transportu
+      updateTransportSystem(delta);
+      window.transportAccum = 0;
+    }
+    
     renderAccum += delta;
     if (renderAccum >= RENDER_INTERVAL) {
       const sx = window.scrollX, sy = window.scrollY;
@@ -2795,7 +2940,7 @@
         }
         
         // Zaktualizuj wyświetlanie wiadra
-        updateBucketDisplay(corridorIndex);
+        renderTeam();
     }
   }
 
