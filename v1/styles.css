@@ -76,10 +76,10 @@ body {
   align-items: center;
   gap: 12px;
   background: #222;
+  position: relative; /* Dla pozycjonowania kurierów */
   border-radius: 16px;
   padding: 10px 12px;
   min-height: 48px;
-  position: relative;
 }
 
 /* Bohater w korytarzu */
@@ -846,7 +846,7 @@ button#btn-mine:disabled .free-diamonds-label {
 
 /* Styling dla kurierów */
 .kurier {
-  transition: left 0.1s ease;
+  /* transition: left 0.5s ease-in-out; - usunięte, animacja w JS */
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
   cursor: pointer;
   z-index: 8;

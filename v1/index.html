@@ -234,7 +234,7 @@
   // System wielu kurierów
   let kurierzyData = [];
   let kurierzyTeam = [];
-  let kurierzyPurchased = false;
+  let kurierzyPurchased = {}; // Obiekt zamiast boolean
 
   const playerDiamondsSpan = document.getElementById("player-diamonds");
   const teamContainer = document.getElementById("team");
@@ -739,6 +739,7 @@
           transportDiamonds += amt;
           corridor.bucketAmount = 0;
           updatePlatformCounter(); // Aktualizuj licznik platformy
+          checkElevatorEnabled(); // Sprawdź czy winda powinna się pojawić
           saveGame();
           renderTeam();
         });
@@ -800,15 +801,23 @@
             }
         };
 
+        // Obszar kuriera (wizualizacja usunięta)
+
         // Kurierzy w środku
         if (kurierzyTeam.length > 0) {
           kurierzyTeam.forEach((kurier, index) => {
             const kurierEl = document.createElement("div");
+            kurierEl.id = `kurier-${kurier.id}`; // Dodano brakujące ID
             kurierEl.className = "kurier";
             kurierEl.style.position = "absolute";
-            kurierEl.style.left = `${kurier.position * 100}%`;
             kurierEl.style.top = `${20 + index * 30}px`;
             kurierEl.style.transform = "translate(-50%, -50%)";
+            
+            // Ustaw początkową pozycję left od razu (pozycja przy platformie)
+            const PLATFORM_WIDTH = 120;
+            const CORRIDOR_PADDING = 12;
+            const platformEndPos = PLATFORM_WIDTH + CORRIDOR_PADDING;
+            kurierEl.style.left = `${platformEndPos}px`;
             
             kurierEl.innerHTML = `
               <div class="kurier-icon">${kurier.icon}</div>
@@ -1314,16 +1323,9 @@
   }
 
   function updateTransportSystem(dt) {
-    console.log("updateTransportSystem wywołane, dt:", dt);
-    console.log("kurierzyTeam:", kurierzyTeam);
-    console.log("kurierzyPurchased:", kurierzyPurchased);
-    console.log("transportDiamonds:", transportDiamonds);
-    console.log("safeDiamonds:", safeDiamonds);
+    // Debug logi usunięte - powodowały zawieszenia
     
-    // Sprawdź czy są kupione kurierzy
-    Object.entries(kurierzyPurchased).forEach(([id, count]) => {
-        console.log(`Kupiony kurier ${id}: ${count} sztuk`);
-    });
+    // Sprawdź czy są kupione kurierzy (debug usunięty)
     
     if (kurierzyTeam.length === 0) {
         console.log("Brak kurierów w teamie - sprawdź czy kupiłeś jakiegoś");
@@ -1332,7 +1334,6 @@
     
     // Aktualizuj kurierów
     kurierzyTeam.forEach((kurier, index) => {
-        console.log(`Aktualizuję kuriera ${index}:`, kurier);
         updateKurier(kurier, dt);
     });
     
@@ -1349,13 +1350,20 @@
     // Logika stanów kuriera
     switch (kurier.state) {
         case "idle":
-            console.log(`Kurier ${kurier.id}: Sprawdzam czy są diamenty na platformie: ${transportDiamonds}`);
-            if (transportDiamonds > 0) {
-                console.log(`Kurier ${kurier.id}: Przechodzę do stanu moving, target=platform`);
-                kurier.state = "moving";
-                kurier.target = "platform";
-                kurier.direction = "left";
-                kurier.progress = 0;
+            // Sprawdź czy windziarz akurat rozładowuje diamenty
+            const windziarzUnloading = windziarzTeam.some(wz => wz.state === "unloading" && wz.unloadingTimer > 0);
+            
+            if (transportDiamonds > 0 && !windziarzUnloading) {
+                // Brak windziarza rozładowującego - kurier może ładować
+                kurier.state = "loading";
+                console.log(`Kurier ${kurier.id}: Przechodzę do loading - brak windziarza rozładowującego`);
+            } else if (transportDiamonds > 0 && windziarzUnloading) {
+                // Windziarz rozładowuje - kurier czeka
+                console.log(`Kurier ${kurier.id}: Czekam na zakończenie rozładunku windziarza`);
+            } else if (transportDiamonds > 0 && kurier.carried >= (kurier.capacity || 1000)) {
+                // Kurier jest pełny - może ładować mimo rozładunku windziarza
+                kurier.state = "loading";
+                console.log(`Kurier ${kurier.id}: Przechodzę do loading - jestem pełny, nie muszę czekać`);
             }
             break;
             
@@ -1369,10 +1377,9 @@
             break;
             
         case "moving":
-            console.log(`Kurier ${kurier.id}: Poruszam się, progress=${kurier.progress}, direction=${kurier.direction}`);
-            const moveSpeed = (kurier.speed || 1.0) * dt;
+            // Zmniejszona prędkość dla lepszej widoczności animacji
+            const moveSpeed = (kurier.speed || 1.0) * dt * 0.3; // 30% normalnej prędkości
             kurier.progress += moveSpeed;
-            console.log(`Kurier ${kurier.id}: Nowy progress=${kurier.progress}, moveSpeed=${moveSpeed}`);
             
             if (kurier.progress >= 1.0) {
                 kurier.progress = 1.0;
@@ -1380,33 +1387,32 @@
                     console.log(`Kurier ${kurier.id}: Dotarłem do platformy, przechodzę do loading`);
                     kurier.state = "loading";
                 } else {
-                    console.log(`Kurier ${kurier.id}: Dotarłem do sejfu, przechodzę do unloading`);
+                    const moveTime = Date.now() - (kurier._moveStartTime || Date.now());
+                    console.log(`Kurier ${kurier.id}: Dotarłem do sejfu po ${moveTime}ms, przechodzę do unloading`);
                     kurier.state = "unloading";
                 }
             }
             break;
             
         case "loading":
-            console.log(`Kurier ${kurier.id}: Ładuję diamenty z platformy`);
             const loadAmount = Math.min(transportDiamonds, kurier.capacity);
-            console.log(`Kurier ${kurier.id}: loadAmount=${loadAmount}, platformDiamonds=${transportDiamonds}, capacity=${kurier.capacity}`);
             if (loadAmount > 0) {
                 transportDiamonds -= loadAmount;
                 kurier.carried = loadAmount;
-                console.log(`Kurier ${kurier.id}: Załadowano ${loadAmount} diamentów, przechodzę do sejfu`);
+                console.log(`Kurier ${kurier.id}: LOADING → MOVING to safe, carried=${kurier.carried}`);
                 kurier.state = "moving";
                 kurier.target = "safe";
                 kurier.direction = "right";
                 kurier.progress = 0;
+                kurier._moveStartTime = Date.now(); // Debug timer
                 updatePlatformCounter();
             }
             break;
             
         case "unloading":
-            console.log(`Kurier ${kurier.id}: Rozładowuję diamenty do sejfu, carried=${kurier.carried}`);
             if (kurier.carried > 0) {
                 safeDiamonds += kurier.carried;
-                console.log(`Kurier ${kurier.id}: Rozładowano ${kurier.carried} diamentów do sejfu, safeDiamonds teraz: ${safeDiamonds}`);
+                console.log(`Kurier ${kurier.id}: UNLOADING → MOVING to platform, rozładowano ${kurier.carried} diamentów`);
                 kurier.carried = 0;
                 kurier.state = "moving";
                 kurier.target = "platform";
@@ -1422,60 +1428,79 @@
             break;
     }
     
-    // Pozycjonowanie kuriera
+    // Pozycjonowanie kuriera - tylko w obszarze między platformą a sejfem
     if (kurierEl) {
         let leftPosition;
         
-        // Dynamicznie określ pozycje platformy i sejfu
-        const platformEl = document.querySelector('.unloading-platform');
-        const safeEl = document.querySelector('.safe');
+        // Stałe pozycje dla kurierów w korytarzu 0
+        const PLATFORM_WIDTH = 120;
+        const SAFE_WIDTH = 120;
+        const KURIER_WIDTH = 60;
+        const CORRIDOR_PADDING = 12; // gap z CSS
         
-        if (platformEl && safeEl) {
-            const platformRect = platformEl.getBoundingClientRect();
-            const safeRect = safeEl.getBoundingClientRect();
-            
-            // Prawa krawędź platformy
-            const platformRightEdge = platformRect.right;
-            // Lewa krawędź sejfu
-            const safeLeftEdge = safeRect.left;
-            // Obszar ruchu kuriera - uwzględniam szerokość kuriera (60px) aby nie nachodził na platformę ani sejf
-            const movementArea = (safeLeftEdge - 60) - (platformRightEdge - 60);
-            
-            if (kurier.state === "loading" || kurier.state === "unloading") {
-                if (kurier.target === "platform") {
-                    leftPosition = platformRightEdge - 60; // Pozycja przy platformie
-                } else if (kurier.target === "safe") {
-                    leftPosition = safeLeftEdge - 60; // Pozycja przy sejfie - uwzględniam szerokość kuriera
-                }
-            } else if (kurier.state === "moving") {
-                if (kurier.direction === "right") {
-                    leftPosition = platformRightEdge - 60 + (kurier.progress * movementArea);
-                } else {
-                    leftPosition = safeLeftEdge - 60 - (kurier.progress * movementArea); // Uwzględniam szerokość kuriera
-                }
-            }
-        } else {
-            // Fallback do starych wartości jeśli elementy nie są dostępne
-            if (kurier.state === "loading" || kurier.state === "unloading") {
-                if (kurier.target === "platform") {
-                    leftPosition = 120;
-                } else if (kurier.target === "safe") {
-                    leftPosition = window.innerWidth - 120 - 60;
-                }
-            } else if (kurier.state === "moving") {
-                if (kurier.direction === "right") {
-                    leftPosition = 120 + (kurier.progress * (window.innerWidth - 240 - 60));
-                } else {
-                    leftPosition = window.innerWidth - 120 - 60 - (kurier.progress * (window.innerWidth - 240 - 60));
-                }
-            }
+        // Obszar ruchu kuriera jest między platformą a sejfem
+        const platformEndPos = PLATFORM_WIDTH + CORRIDOR_PADDING; // 132px
+        
+        // Pozycja sejfu względem korytarza (nie całego okna!)
+        const corridorEl = kurierEl.parentElement;
+        const corridorWidth = corridorEl ? corridorEl.offsetWidth : window.innerWidth;
+        const safeStartPos = corridorWidth - SAFE_WIDTH - CORRIDOR_PADDING; // Pozycja względem korytarza
+        
+        const kurierAreaWidth = safeStartPos - platformEndPos - KURIER_WIDTH;
+        
+        // Jednorazowy debug obliczonych pozycji
+        if (!kurier._positionsLogged) {
+            console.log(`Kurier ${kurier.id} SETUP: corridorWidth=${corridorWidth}, platformEndPos=${platformEndPos}, safeStartPos=${safeStartPos}, kurierAreaWidth=${kurierAreaWidth}`);
+            kurier._positionsLogged = true;
         }
         
+        // Pozycje dla różnych stanów
+        switch (kurier.state) {
+            case "idle":
+                // Kurier czeka przy platformie
+                leftPosition = platformEndPos;
+                break;
+                
+            case "loading":
+                // Kurier ładuje przy platformie
+                leftPosition = platformEndPos;
+                break;
+                
+            case "moving":
+                if (kurier.target === "platform") {
+                    // Ruch w lewo - do platformy (od sejfu do platformy)
+                    const safeEndPos = safeStartPos - KURIER_WIDTH;
+                    leftPosition = platformEndPos + ((safeEndPos - platformEndPos) * (1 - kurier.progress));
+                } else if (kurier.target === "safe") {
+                    // Ruch w prawo - do sejfu (od platformy do sejfu)
+                    const safeEndPos = safeStartPos - KURIER_WIDTH;
+                    leftPosition = platformEndPos + ((safeEndPos - platformEndPos) * kurier.progress);
+                }
+                break;
+                
+            case "unloading":
+                // Kurier rozładowuje przy sejfie
+                leftPosition = safeStartPos - KURIER_WIDTH;
+                break;
+                
+            default:
+                leftPosition = platformEndPos;
+                break;
+        }
+        
+        // Ustaw pozycję kuriera z płynną animacją
         if (leftPosition !== undefined) {
-            console.log(`Kurier ${kurier.id}: Ustawiam pozycję left=${leftPosition}px, stan=${kurier.state}`);
+            // Zapisz poprzednią pozycję w obiekcie kuriera
+            kurier._previousLeft = kurier._currentLeft || leftPosition;
+            kurier._currentLeft = leftPosition;
+            
+            // Debug: loguj tylko przy znaczących zmianach pozycji
+            if (Math.abs(leftPosition - kurier._previousLeft) > 10) {
+                console.log(`Kurier ${kurier.id} POZYCJA: ${kurier._previousLeft.toFixed(0)} → ${leftPosition.toFixed(0)}px, stan=${kurier.state}`);
+            }
+            
+            // Ustaw pozycję bezpośrednio bez animacji CSS
             kurierEl.style.left = `${leftPosition}px`;
-        } else {
-            console.log(`Kurier ${kurier.id}: Brak pozycji left, stan=${kurier.state}`);
         }
     }
 }
@@ -1557,30 +1582,53 @@
     popupAction.textContent = "Kup";
 
     popupAction.onclick = () => {
+      console.log("=== ROZPOCZĘCIE ZAKUPU KURIERA ===");
+      console.log("safeDiamonds:", safeDiamonds, "koszt:", kurierData.cost);
+      
       if (safeDiamonds < kurierData.cost) {
         alert("Za mało diamentów na zakup kuriera.");
         return;
       }
       
+      console.log("Sprawdzenie kosztów - OK");
       safeDiamonds -= kurierData.cost;
       kurierzyPurchased[kurierData.id] = (kurierzyPurchased[kurierData.id] || 0) + 1;
       
+      console.log("Tworzę instancję kuriera...");
       // Dodaj kuriera do teamu
-      const newKurier = createKurierInstance(kurierData.id);
+      const newKurier = createKurierInstance(kurierData);
+      console.log("Utworzona instancja kuriera:", newKurier);
+      
       kurierzyTeam.push(newKurier);
       console.log(`Kurier ${kurierData.id} dodany do teamu:`, newKurier);
       console.log("kurierzyTeam po dodaniu:", kurierzyTeam);
       
-      // Zaktualizuj wyświetlanie
-      updateDiamondsDisplay();
-      renderKurierzyShop();
-      
-      // Przerenderuj korytarz 0 żeby pokazać nowego kuriera
-      renderTeam();
-      
-      // Zamknij popup
-      popup.style.display = "none";
-      saveGame();
+      try {
+        console.log("Wywołuję updateDiamondsDisplay()...");
+        updateDiamondsDisplay();
+        
+        console.log("Wywołuję renderKurierzyShop()...");
+        renderKurierzyShop();
+        
+        console.log("Wywołuję renderTeam()...");
+        // Przerenderuj korytarz 0 żeby pokazać nowego kuriera
+        renderTeam();
+        
+        console.log("Kurier zakupiony pomyślnie, zamykam popup");
+        
+        // Zamknij popup
+        popup.style.display = "none";
+        
+        console.log("Wywołuję saveGame()...");
+        saveGame();
+        
+        console.log("=== ZAKUP KURIERA ZAKOŃCZONY ===");
+      } catch (error) {
+        console.error("Błąd podczas zakupu kuriera:", error);
+        console.error("Stack trace:", error.stack);
+        // Mimo błędu zamknij popup
+        popup.style.display = "none";
+      }
     };
 
     popup.style.display = "flex";
@@ -1891,8 +1939,10 @@
   }
 
   function checkElevatorEnabled() {
-    const shouldBeEnabled = Number(safeDiamonds) >= Number(graConfig.liftAfterCollectionOf) || windziarzPurchased;
-    // Debug: console.log(`checkElevatorEnabled: safeDiamonds=${safeDiamonds}, required=${graConfig.liftAfterCollectionOf}, windziarzPurchased=${windziarzPurchased}, shouldBeEnabled=${shouldBeEnabled}, elevatorEnabled=${elevatorEnabled}`);
+    // Sprawdź łączną ilość diamentów (sejf + platforma)
+    const totalDiamonds = safeDiamonds + transportDiamonds;
+    const shouldBeEnabled = Number(totalDiamonds) >= Number(graConfig.liftAfterCollectionOf) || windziarzPurchased;
+    console.log(`checkElevatorEnabled: safeDiamonds=${safeDiamonds}, transportDiamonds=${transportDiamonds}, totalDiamonds=${totalDiamonds}, required=${graConfig.liftAfterCollectionOf}, windziarzPurchased=${windziarzPurchased}, shouldBeEnabled=${shouldBeEnabled}, elevatorEnabled=${elevatorEnabled}`);
     if (shouldBeEnabled && !elevatorEnabled) {
       elevatorEnabled = true;
       const windziarzeShop = document.getElementById("windziarze-shop");
@@ -2086,19 +2136,44 @@
   }
 
   function windziarzGameLoop(dt) {
-    if (!elevatorEnabled) return;
+    // Windziarze działają jeśli zostali kupieni, niezależnie od elevatorEnabled
+    if (!windziarzPurchased) return;
     
     for (const wz of windziarzTeam) {
-    console.log(`Windziarz stan: ${wz.state}`);
       switch (wz.state) {
         case "idle":
           wz.position = 0;
           wz.carried = 0;
-          wz.state = "moving";
-          wz.target = 0;
+          
+          // Sprawdź czy są wiadra z diamentami do zebrania
+          let foundBucket = false;
+          let totalBuckets = 0;
+          for (let idx = 1; idx < corridors.length; idx++) {
+            const bucketAmount = corridors[idx].bucketAmount || 0;
+            totalBuckets += bucketAmount;
+            if (bucketAmount > 0) {
+              foundBucket = true;
+              console.log(`Windziarz w idle: znaleziono wiadro ${idx} z ${bucketAmount} diamentami`);
+              break;
+            }
+          }
+          
+          console.log(`Windziarz w idle: totalBuckets=${totalBuckets}, foundBucket=${foundBucket}, corridors.length=${corridors.length}`);
+          
+          if (foundBucket) {
+            // Jeśli są wiadra z diamentami, idź je zbierać
+            console.log("Windziarz: przechodzę z idle do moving");
+            wz.state = "moving";
+            wz.target = 0; // Zacznie szukać od pozycji 1
+          } else {
+            // Jeśli nie ma diamentów, pozostań w idle
+            console.log("Windziarz: pozostaję w idle - brak wiadel z diamentami");
+            wz.state = "idle";
+            wz.target = 0;
+          }
           break;
         case "moving":
-          console.log("Windziarz w stanie moving, carried:", wz.carried, "capacity:", wz.capacity);
+          // Debug log usunięty
           if (wz.carried >= (wz.capacity || 1000)) {
             console.log("Windziarz pełny, wraca na górę");
             wz.state = "returning";
@@ -2109,7 +2184,7 @@
           let found = false;
           for (let idx = Math.round(Math.max(1, wz.position)); idx < corridors.length; idx++) {
             const bucketAmount = corridors[idx].bucketAmount || 0;
-            console.log(`Sprawdzam korytarz ${idx}: ${bucketAmount} diamentów`);
+            console.log(`Windziarz sprawdza korytarz ${idx}: ${bucketAmount} diamentów (corridors.length=${corridors.length})`);
             if (bucketAmount > 0) {
               wz.target = idx;
               found = true;
@@ -2136,7 +2211,9 @@
 
             const corridorEl = teamContainer.querySelector(`[data-corridor-index="${wz.target}"]`);
             const windziarzEl = document.getElementById(`windziarz-${wz.id}`);
-            console.log(`Windziarz Corridor element:`, corridorEl, `Windziarz element:`, windziarzEl);
+            console.log(`Windziarz DEBUG - target: ${wz.target}, corridorEl:`, !!corridorEl, `windziarzEl:`, !!windziarzEl);
+            if (!corridorEl) console.log(`Nie znaleziono korytarza [data-corridor-index="${wz.target}"]`);
+            if (!windziarzEl) console.log(`Nie znaleziono windziarza #windziarz-${wz.id}`);
 
             if (corridorEl && windziarzEl) {
                 const bucketEl = corridorEl.querySelector('.bucket');
@@ -2150,6 +2227,7 @@
                     const loadingSpeed = wz.loadingspeed || 50;
                     const duration = (amountToLoad / loadingSpeed);
                     
+                    console.log(`Windziarz Ładowanie: bucketAmount=${corridor.bucketAmount}, carried=${wz.carried}, capacity=${wz.capacity}`);
                     console.log(`Windziarz Ładowanie: amountToLoad=${amountToLoad}, loadingSpeed=${loadingSpeed}, duration=${duration}s`);
                     
                     // Ustaw timer na czas trwania ładowania
@@ -2159,9 +2237,13 @@
                     // Wyczyść wiadro, diamenty są w locie
                     corridor.bucketAmount = Math.max(0, corridor.bucketAmount - amountToLoad);
                     
+                    // NATYCHMIAST aktualizuj carried, animacja jest tylko wizualna
+                    wz.carried = (wz.carried || 0) + amountToLoad;
+                    console.log(`Windziarz Natychmiast załadowano ${amountToLoad}, carried: ${wz.carried}`);
+                    
                     const onDiamondReach = (value) => {
-                      wz.carried = (wz.carried || 0) + value;
-                      console.log(`Windziarz Diament dotarł, carried: ${wz.carried}`);
+                      // Callback dla animacji - już nie potrzebny dla logiki
+                      console.log(`Windziarz Animacja diamentu zakończona: ${value}`);
                     };
                     spawnDiamondSprites(startRect, endRect, amountToLoad, duration * 1000, onDiamondReach);
                 } else {
@@ -2173,23 +2255,23 @@
           }
           break;
         case "loading":
-          console.log(`Windziarz loading: timer=${wz.loadingTimer}, carried=${wz.carried}, capacity=${wz.capacity}`);
+          // Debug log usunięty
           // Odejmuj czas od timera
           if (wz.loadingTimer > 0) {
             wz.loadingTimer -= dt;
-            console.log(`Windziarz Timer ładowania: ${wz.loadingTimer.toFixed(2)}s`);
           }
 
           // Gdy timer dobiegnie końca, zdecyduj co dalej
           if (wz.loadingTimer <= 0) {
             console.log("Windziarz Timer ładowania dobiegł końca");
             const corridor = corridors[wz.target];
+            console.log(`Windziarz po ładowaniu: carried=${wz.carried}, capacity=${wz.capacity}, bucketAmount=${corridor?.bucketAmount || 0}`);
             if (wz.carried >= (wz.capacity || 1000)) {
                 console.log("Windziarz pełny, wraca na górę");
                 wz.state = "returning";
                 wz.target = 0;
             } else if ((corridor.bucketAmount || 0) <= 0) {
-                console.log("Windziarz Wiado puste, szukam dalej");
+                console.log("Windziarz Wiadro puste, szukam dalej");
                 // Jeśli wiadro jest puste, a my nie jesteśmy pełni, szukaj dalej
                 if (wz.carried < (wz.capacity || 1000) && wz.target < corridors.length - 1) {
                   wz.state = "moving";
@@ -2197,6 +2279,25 @@
                   console.log(`Windziarz Przechodzę do korytarza ${wz.target}`);
                 } else {
                   console.log("Windziarz Brak więcej korytarzy, wracam na górę");
+                  wz.state = "returning";
+                  wz.target = 0;
+                }
+            } else {
+                console.log("Windziarz Wiadro ma jeszcze diamenty, ładuję dalej");
+                // Wiadro ma jeszcze diamenty i windziarz nie jest pełny - kontynuuj ładowanie
+                const amountToLoad = Math.min(corridor.bucketAmount || 0, (wz.capacity || 1000) - (wz.carried || 0));
+                if (amountToLoad > 0) {
+                  const loadingSpeed = wz.loadingspeed || 50;
+                  const duration = (amountToLoad / loadingSpeed);
+                  wz.loadingTimer = duration;
+                  
+                  // NATYCHMIAST dodaj diamenty do carried i usuń z wiadra
+                  wz.carried = (wz.carried || 0) + amountToLoad;
+                  corridor.bucketAmount = Math.max(0, corridor.bucketAmount - amountToLoad);
+                  
+                  console.log(`Windziarz Kontynuuję ładowanie: ${amountToLoad} diamentów przez ${duration}s, carried: ${wz.carried}, bucketAmount: ${corridor.bucketAmount}`);
+                } else {
+                  console.log("Windziarz Nie można więcej załadować, wracam na górę");
                   wz.state = "returning";
                   wz.target = 0;
                 }
@@ -2220,13 +2321,12 @@
                 // Ustaw timer na czas trwania rozładunku
                 wz.unloadingTimer = duration;
 
-                // Rozładuj diamenty na platformę rozładunkową
-                transportDiamonds += amountToUnload;
+                console.log(`Windziarz Rozpoczynam rozładunek ${amountToUnload} diamentów na platformę przez ${duration}s`);
                 
-                // Wyczyść ładunek
-                wz.carried = 0;
+                // Diamenty będą dodawane stopniowo przez czas rozładunku
+                // (nie dodajemy ich od razu - to się dzieje w case "unloading")
                 
-                // Zapisz grę gdy diamenty trafią na platformę
+                // Zapisz grę gdy rozpocznie się rozładunek
                 saveGame();
             } else {
                 // Jeśli nie ma co rozładować, przejdź od razu dalej
@@ -2239,10 +2339,35 @@
           // Odejmuj czas od timera
           if (wz.unloadingTimer > 0) {
             wz.unloadingTimer -= dt;
+            
+            // Dodaj diamenty stopniowo przez czas rozładunku
+            const totalAmount = wz.carried || 0;
+            const unloadingSpeed = wz.loadingspeed || 50;
+            const amountPerSecond = unloadingSpeed;
+            const amountToAdd = Math.min(amountPerSecond * dt, wz.carried);
+            
+            if (amountToAdd > 0) {
+              // Dodaj diamenty do platformy
+              transportDiamonds += amountToAdd;
+              wz.carried = Math.max(0, wz.carried - amountToAdd);
+              
+              // Aktualizuj licznik platformy
+              updatePlatformCounter();
+              
+              console.log(`Windziarz Rozładunek w toku: +${amountToAdd.toFixed(2)}, pozostało ${wz.carried.toFixed(2)}, timer: ${wz.unloadingTimer.toFixed(2)}s`);
+            }
           }
           
           // Gdy timer dobiegnie końca, przejdź do stanu bezczynności
           if (wz.unloadingTimer <= 0) {
+            // Dodaj pozostałe diamenty
+            if (wz.carried > 0) {
+              transportDiamonds += wz.carried;
+              wz.carried = 0;
+              updatePlatformCounter();
+              console.log(`Windziarz Rozładunek zakończony, wszystkie diamenty na platformie: transportDiamonds=${transportDiamonds}`);
+            }
+            
             wz.state = "idle";
             saveGame();
           }
@@ -2318,7 +2443,7 @@
         
         // Wczytaj system kurierów
         kurierzyTeam = (state.kurierzyTeam || []).map(k => ({ ...k }));
-        kurierzyPurchased = !!state.kurierzyPurchased;
+        kurierzyPurchased = state.kurierzyPurchased || {};
         
         // Wczytaj system transportu
         transportDiamonds = state.transportDiamonds || 0;
@@ -2364,7 +2489,6 @@
     const delta = (now - lastTime) / 1000;
     lastTime = now;
     gameLoopStep(delta);
-    windziarzGameLoop(delta);
     updateTransportSystem(delta);
     renderAccum += delta;
     if (renderAccum >= RENDER_INTERVAL) {
@@ -2510,6 +2634,7 @@
       kopDelayUntil = now + FREE_DIAMONDS_DELAY;
       updatePlatformCounter(); // Aktualizuj licznik platformy
       // NIE wywołujemy updateDiamondsDisplay() - licznik "Diamenty" się nie zmienia dopóki nie klikniesz platformy
+      checkElevatorEnabled(); // Sprawdź czy winda powinna się pojawić (uwzględnia transportDiamonds)
       saveGame();
       
       try {
@@ -2517,15 +2642,10 @@
         const platformEl = document.querySelector('.unloading-platform');
         if (platformEl) {
           const endRect = platformEl.getBoundingClientRect();
-          console.log('Kop: Animacja leci do platformy');
           // Wyślij dokładnie tyle diamentów ile zostało wygenerowane - do platformy
           spawnDiamondSprites(startRect, endRect, diamondsToAdd, 400);
-        } else {
-          console.log('Kop: Platforma nie znaleziona - brak animacji');
-          // Sprawdź czy korytarz 0 istnieje
-          console.log('Corridors:', corridors.length);
-          console.log('Team:', team.length);
         }
+        // Brak animacji jeśli platforma nie istnieje
       } catch (e) {
         console.log('Kop: Błąd animacji:', e);
       }
@@ -2647,31 +2767,7 @@
   }
 
   // W funkcji renderowania korytarza 0, w miejscu gdzie renderowane są kurierzy
-  if (corridorIndex === 0) {
-    console.log("=== RENDEROWANIE KORYTARZA 0 ===");
-    console.log("kurierzyTeam:", kurierzyTeam);
-    console.log("kurierzyTeam.length:", kurierzyTeam.length);
-    
-    // Renderuj kurierów
-    kurierzyTeam.forEach((kurier, index) => {
-        console.log(`Tworzę element DOM dla kuriera: ${kurier.id}`);
-        const kurierEl = document.createElement('div');
-        kurierEl.id = `kurier-${kurier.id}`;
-        kurierEl.className = 'kurier';
-        kurierEl.innerHTML = kurier.icon || '🏃';
-        kurierEl.onclick = () => showKurierPopup(kurier);
-        
-        // Ustaw początkową pozycję
-        kurierEl.style.left = '120px'; // Przy platformie
-        kurierEl.style.top = `${100 + index * 80}px`;
-        
-        corridorEl.appendChild(kurierEl);
-        console.log(`Kurier ${kurier.id} dodany do DOM, element:`, kurierEl);
-        console.log(`Kurier ${kurier.id} ID:`, kurierEl.id);
-    });
-    
-    console.log("Kurierzy po renderowaniu:", document.querySelectorAll('.kurier'));
-  }
+  // Usunięto błędny kod poza funkcją
 
   // ... existing code ...
   // W funkcji renderCorridor, na początku
