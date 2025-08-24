@@ -757,11 +757,11 @@ button#btn-mine:disabled .free-diamonds-label {
   right: 12px;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 5;
+  z-index: 15;
 }
 
 /* Platforma rozładunkowa */
-.unloading-platform { 
+.unloading-platform {
   width: 120px;
   flex-shrink: 0;
   background: linear-gradient(135deg, #8B4513, #A0522D);
@@ -769,24 +769,24 @@ button#btn-mine:disabled .free-diamonds-label {
   border-radius: 10px;
   padding: 15px;
   text-align: center;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  box-shadow: 0 40px 8px rgba(0,0,0,0.3);
   color: white;
   font-weight: bold;
   cursor: pointer;
   transition: background 0.3s ease, box-shadow 0.3s ease;
-  /* DEBUG: Czerwona otoczka */
   outline: 3px solid #ff0000;
   outline-offset: 2px;
   position: absolute;
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 5;
-} 
+  z-index: 15;
+  pointer-events: auto;
+}
 
 .unloading-platform:hover {
-    background: linear-gradient(135deg, #A0522D, #CD853F);
-    box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+  background: linear-gradient(135deg, #A0522D, #CD853F) !important;
+  box-shadow: 0 6px 12px rgba(0,0,0,0.4) !important;
 }
 
 /* Bohater transportowy */
@@ -843,6 +843,7 @@ button#btn-mine:disabled .free-diamonds-label {
   transition: left 0.1s ease;
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
   cursor: pointer;
+  z-index: 8;
 }
 
 .kurier:hover {
@@ -879,9 +880,9 @@ button#btn-mine:disabled .free-diamonds-label {
   font-size: 0.8rem;
   box-sizing: border-box; /* Uwzględnij padding i border w szerokości */
   /* DEBUG: Niebieska otoczka */
-  outline: 3px solid #ff00ea;
+  outline: 3px solid #0066ff;
   outline-offset: 2px;
-  z-index: 37;
+  z-index: 3;
 }
 
 .platform-counter {

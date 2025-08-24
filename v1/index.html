@@ -758,16 +758,7 @@
       if (i === 0) {
         // Korytarz 0 - platforma rozładunkowa po lewej + kurierzy w środku + sejf po prawej
         
-                        // Kontener transportu
-                const transportContainer = document.createElement("div");
-                transportContainer.style.position = "absolute";
-                transportContainer.style.left = "0";
-                transportContainer.style.top = "0";
-                transportContainer.style.width = "100%";
-                transportContainer.style.height = "100%";
-                transportContainer.style.zIndex = "1";
-                transportContainer.style.outline = "2px solid #ffff00";
-                transportContainer.style.outlineOffset = "1px";
+                        // Usunięto transportContainer
         
         // Platforma rozładunkowa po lewej stronie
         const unloadingPlatform = document.createElement("div");
@@ -777,7 +768,33 @@
           <div class="platform-label">Platforma</div>
           <div class="platform-diamonds">${formatNumber(transportDiamonds)}</div>
         `;
-        transportContainer.appendChild(unloadingPlatform);
+        corridorEl.appendChild(unloadingPlatform);
+
+        // Dodaj kliknięcie w platformę - tak jak dla innych elementów
+        unloadingPlatform.onclick = function() {
+            console.log('=== KLIKNIĘTO PLATFORMĘ ===');
+            
+            if (gameState.platformDiamonds > 0) {
+                const amount = gameState.platformDiamonds;
+                
+                gameState.platformDiamonds = 0;
+                gameState.diamonds += amount;
+                
+                updatePlatformCounter();
+                updateDiamondDisplay();
+                
+                // Animacja (opcjonalna)
+                const platformEl = document.querySelector('.unloading-platform');
+                const safeEl = document.querySelector('.safe');
+                if (platformEl && safeEl && typeof spawnDiamondSprites === 'function') {
+                    const startRect = platformEl.getBoundingClientRect();
+                    const endRect = safeEl.getBoundingClientRect();
+                    spawnDiamondSprites(startRect, endRect, amount, 1000);
+                }
+            } else {
+                console.log('Platforma jest pusta');
+            }
+        };
 
         // Kurierzy w środku
         if (kurierzyTeam.length > 0) {
@@ -788,7 +805,6 @@
             kurierEl.style.left = `${kurier.position * 100}%`;
             kurierEl.style.top = `${20 + index * 30}px`;
             kurierEl.style.transform = "translate(-50%, -50%)";
-            kurierEl.style.zIndex = "10";
             
             kurierEl.innerHTML = `
               <div class="kurier-icon">${kurier.icon}</div>
@@ -817,7 +833,8 @@
               showKurierPopup(kurier);
             };
             
-            transportContainer.appendChild(kurierEl);
+            // Dodaj kuriera do korytarza
+            corridorEl.appendChild(kurierEl);
           });
         } else {
           // Pokaż informację o braku kurierów
@@ -829,7 +846,7 @@
               <div>Kup kuriera aby transportować diamenty</div>
             </div>
           `;
-          transportContainer.appendChild(noKurierInfo);
+          corridorEl.appendChild(noKurierInfo);
         }
 
         // Sejf po prawej stronie
@@ -852,11 +869,8 @@
           }
         };
         
-        // Dodaj sejf do kontenera transportu
-        transportContainer.appendChild(safeEl);
-        
-        // Dodaj kontener transportu do korytarza
-        corridorEl.appendChild(transportContainer);
+        // Dodaj sejf do korytarza
+        corridorEl.appendChild(safeEl);
       } else {
         // Prawdziwy korytarz z ścianą do kopania
         const wall = document.createElement("div");
@@ -2657,55 +2671,41 @@
       <div class="platform-counter">Diamenty: ${gameState.platformDiamonds || 0}</div>
   `;
 
-  // Dodaj kliknięcie w platformę
-  unloadingPlatform.onclick = function() {
-      alert('Kliknięto platformę!'); // Prosty test
-      console.log('=== KLIKNIĘTO PLATFORMĘ ===');
-      
-      if (gameState.platformDiamonds > 0) {
-          const amount = gameState.platformDiamonds;
-          console.log(`Przenoszę ${amount} diamentów z platformy do sejfu`);
-          
-          gameState.platformDiamonds = 0;
-          gameState.diamonds += amount;
-          
-          // Zaktualizuj licznik platformy
-          updatePlatformCounter();
-          
-          // Zaktualizuj wyświetlanie diamentów
-          updateDiamondDisplay();
-          
-          // Animuj przeniesienie diamentów do sejfu
-          const platformEl = document.querySelector('.unloading-platform');
-          const safeEl = document.querySelector('.safe');
-          
-          if (platformEl && safeEl) {
-              const startRect = platformEl.getBoundingClientRect();
-              const endRect = safeEl.getBoundingClientRect();
-              
-              // Sprawdź czy funkcja spawnDiamondSprites istnieje
-              if (typeof spawnDiamondSprites === 'function') {
-                  spawnDiamondSprites(startRect, endRect, amount, 1000, () => {
-                      console.log(`Przeniesiono ${amount} diamentów z platformy do sejfu`);
-                  });
-              } else {
-                  console.error('Funkcja spawnDiamondSprites nie istnieje!');
-                  console.log(`Przeniesiono ${amount} diamentów z platformy do sejfu (bez animacji)`);
-              }
-          } else {
-              console.error('Nie znaleziono elementów platformy lub sejfu');
-          }
-          
-          console.log(`Kliknięto platformę - przeniesiono ${amount} diamentów do sejfu`);
-      } else {
-          console.log('Platforma jest pusta');
+  // Delegacja eventu dla platformy rozładunkowej
+  if (i === 0) {
+    corridorEl.addEventListener('click', function(event) {
+      const platform = event.target.closest('.unloading-platform');
+      if (platform) {
+        // alert('Kliknięto platformę przez delegację!'); // Prosty test
+        console.log('=== KLIKNIĘTO PLATFORMĘ (DELEGACJA) ===');
+        
+        if (gameState.platformDiamonds > 0) {
+            const amount = gameState.platformDiamonds;
+            console.log(`Przenoszę ${amount} diamentów z platformy do sejfu`);
+            
+            gameState.platformDiamonds = 0;
+            gameState.diamonds += amount;
+            
+            updatePlatformCounter();
+            updateDiamondDisplay();
+            
+            const platformEl = document.querySelector('.unloading-platform');
+            const safeEl = document.querySelector('.safe');
+            
+            if (platformEl && safeEl && typeof spawnDiamondSprites === 'function') {
+                const startRect = platformEl.getBoundingClientRect();
+                const endRect = safeEl.getBoundingClientRect();
+                spawnDiamondSprites(startRect, endRect, amount, 1000);
+            }
+        } else {
+            console.log('Platforma jest pusta');
+        }
       }
-  };
-
-  console.log('Platforma onclick ustawiony:', unloadingPlatform.onclick);
+    });
+  }
 
   // Dodaj cursor pointer do platformy
-  unloadingPlatform.style.cursor = 'pointer';
+  unloadingPlatform.style.pointerEvents = 'auto';
 
   // Dodaj platformę do korytarza
   corridorEl.appendChild(unloadingPlatform);
