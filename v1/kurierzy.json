@@ -1,0 +1,52 @@
+[
+  {
+    "id": "kurier1",
+    "name": "Kurier Nowicjusz",
+    "icon": "🏃",
+    "image": null,
+    "cost": 100,
+    "speed": 1.0,
+    "capacity": 50,
+    "loadingspeed": 10
+  },
+  {
+    "id": "kurier2", 
+    "name": "Kurier Doświadczony",
+    "icon": "🏃‍♂️",
+    "image": null,
+    "cost": 500,
+    "speed": 1.5,
+    "capacity": 100,
+    "loadingspeed": 15
+  },
+  {
+    "id": "kurier3",
+    "name": "Kurier Ekspert",
+    "icon": "🏃‍♀️",
+    "image": null,
+    "cost": 2000,
+    "speed": 2.0,
+    "capacity": 200,
+    "loadingspeed": 25
+  },
+  {
+    "id": "kurier4",
+    "name": "Kurier Mistrz",
+    "icon": "🚶‍♂️",
+    "image": null,
+    "cost": 10000,
+    "speed": 3.0,
+    "capacity": 500,
+    "loadingspeed": 40
+  },
+  {
+    "id": "kurier5",
+    "name": "Kurier Legendarny",
+    "icon": "🏃‍♂️",
+    "image": null,
+    "cost": 50000,
+    "speed": 5.0,
+    "capacity": 1000,
+    "loadingspeed": 60
+  }
+]

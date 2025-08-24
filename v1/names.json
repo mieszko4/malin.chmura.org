@@ -97,7 +97,17 @@
       "Cichy",
       "Głośny",
       "Kolorowy",
-      "Czarno-biały"
+      "Czarno-biały",
+      "Zwinny",
+      "Szybki",
+      "Silny",
+      "Mądry",
+      "Odważny",
+      "Sprytny",
+      "Wytrzymały",
+      "Zręczny",
+      "Inteligentny",
+      "Heroiczny"
     ],
       "zdrobnienia_imion": [
         "Bodzio", "Staszek", "Władeczek", "Krzysiu", "Zbyszko", 
@@ -120,7 +130,22 @@
         "Florek", "Gracjan", "Hektor", "Inez", "Jacek",
         "Kornel", "Lubomir", "Marcin", "Nepomucen", "Orest",
         "Prokop", "Radosław", "Seweryn", "Tytus", "Władysław",
-        "Zbigniew", "Żaneto"
-      ]
+        "Zbigniew", "Żaneto", "Krecik", "Kopacz", "Górnik",
+        "Poszukiwacz", "Odkrywca", "Badacz", "Eksplorator",
+        "Wędrowiec", "Podróżnik", "Odkrywca"
+      ],
+      "poziomy": {
+    "0": {"nazwa": "Zwykły", "kolor": "#9ca3af"},
+    "1": {"nazwa": "Początkujący", "kolor": "#ffffff"},
+    "2": {"nazwa": "Uczący się", "kolor": "#e6f7ff"},
+    "3": {"nazwa": "Doświadczony", "kolor": "#b3e6ff"},
+    "4": {"nazwa": "Wykwalifikowany", "kolor": "#85c9ff"},
+    "5": {"nazwa": "Ekspert", "kolor": "#5fb2ff"},
+    "6": {"nazwa": "Mistrz", "kolor": "#7d5bed"},
+    "7": {"nazwa": "Wielki Mistrz", "kolor": "#9d4edd"},
+    "8": {"nazwa": "Arcymistrz", "kolor": "#c77dff"},
+    "9": {"nazwa": "Boski", "kolor": "#e2b2ff"},
+    "10": {"nazwa": "Legendarny", "kolor": "#ffd700"}
+  }
     
   }
