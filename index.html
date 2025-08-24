@@ -1,1 +1,2667 @@
-<head><meta name="verify-admitad" content="a7390a3480" /></head>
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Kopalnia Diamentów - Idle Clicker</title>
+<link rel="stylesheet" href="styles.css" />
+<style>
+  /* efekt lotu diamentu do licznika */
+  .diamond-sprite {
+    position: fixed;
+    font-size: 20px;
+    transform: translate(-50%, -50%) scale(1);
+    animation: diamond-fly 700ms cubic-bezier(.2,.7,.2,1) forwards;
+    pointer-events: none;
+    z-index: 9999;
+    will-change: transform, opacity;
+  }
+  @keyframes diamond-fly {
+    0% {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, -120px))) scale(0.6);
+      opacity: 0;
+    }
+  }
+  .loading-bar {
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 8px;
+    background-color: #333;
+    border: 1px solid #555;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .loading-fill {
+    width: 0%;
+    height: 100%;
+    background-color: #4caf50;
+    border-radius: 4px;
+    transition: width 0.2s linear;
+  }
+  /* Pionowy pasek postępu w szybie windy */
+  .elevator-progress-bar {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    overflow: hidden;
+    z-index: 5;
+  }
+
+  .elevator-progress-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 0%;
+    background: linear-gradient(to top, #06d6a0, #118ab2);
+    border-radius: 2px;
+    transition: height 0.1s ease;
+    box-shadow: 0 0 8px rgba(6, 214, 160, 0.5);
+  }
+
+  /* Animacja dla aktywnego paska */
+  .elevator-progress-fill.active {
+    animation: elevator-pulse 2s ease-in-out infinite alternate;
+  }
+
+  @keyframes elevator-pulse {
+    from { box-shadow: 0 0 8px rgba(6, 214, 160, 0.5); }
+    to { box-shadow: 0 0 12px rgba(6, 214, 160, 0.8); }
+  }
+  
+  /* Styling dla wydajności kopacza */
+  .efficiency-stat {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: 8px 0;
+    border: 2px solid #4a5568;
+  }
+  
+  .efficiency-value {
+    color: #f7fafc !important;
+    font-weight: bold;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  }
+  
+  .efficiency-stat .hero-stat-label {
+    color: #e2e8f0 !important;
+    font-weight: 600;
+  }
+  
+  /* Styling dla wskaźnika wydajności w korytarzu */
+  .efficiency-indicator {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
+  }
+  
+  .efficiency-indicator:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  
+  .efficiency-rate {
+    color: #4ade80;
+    font-weight: bold;
+  }
+
+  /* Styling dla sejfu */
+  .safe {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 120px;
+    background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+    border: 2px solid #daa520;
+    border-radius: 8px;
+    padding: 8px 12px;
+    text-align: center;
+    color: #8b4513;
+    font-weight: bold;
+    font-size: 0.9rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    cursor: pointer;
+    z-index: 5;
+  }
+
+  /* Platforma rozładunkowa */
+  .unloading-platform {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 120px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    z-index: 5;
+  }
+</style>
+</head>
+<body>
+<button id="btn-reset" aria-label="Resetuj stan gry">Reset</button>
+<div id="app" role="main">
+  <div id="player-diamonds" aria-live="polite" aria-atomic="true">💎 Diamenty: 0</div>
+  <div id="team-efficiency" aria-live="polite" aria-atomic="true" style="text-align: center; margin: 10px 0; padding: 8px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; font-weight: bold;">
+    🚀 Wydajność drużyny: <span id="total-efficiency">0 d/s</span>
+  </div>
+  <section id="team" aria-label="Drużyna bohaterów i korytarze" role="list"></section>
+  <button id="btn-mine" aria-label="Ręczne kopanie diamentów">Kop</button>
+  <section class="shop-container" aria-label="Sklep bohaterów">
+    <div class="shop-title">Sklep bohaterów</div>
+    <div class="shop-list" id="heroes-list" role="list"></div>
+  </section>
+  <section class="shop-container" aria-label="Sklep narzędzi">
+    <div class="shop-title">Sklep narzędzi</div>
+    <div class="shop-list" id="tools-list" role="list"></div>
+  </section>
+</div>
+<div id="popup" role="dialog" aria-modal="true" aria-labelledby="popup-title" aria-describedby="popup-desc">
+  <div id="popup-content" tabindex="0">
+    <h3 id="popup-title"></h3>
+    <div id="popup-desc"></div>
+    <button id="popup-action" class="action-btn"></button>
+    <button id="popup-close">Zamknij</button>
+  </div>
+</div>
+<script>
+(() => {
+  "use strict";
+
+  function formatNumber(n) {
+    n = Number(n) || 0;
+    if (n < 1000) {
+      return Math.floor(n).toString();
+    }
+    const si = [
+      { value: 1e12, symbol: "t" },
+      { value: 1e9, symbol: "b" },
+      { value: 1e6, symbol: "m" },
+      { value: 1e3, symbol: "k" }
+    ];
+    for (const item of si) {
+      if (n >= item.value) {
+        const val = n / item.value;
+        return val.toFixed(2) + item.symbol;
+      }
+    }
+    return n.toString();
+  }
+
+  const defaultHeroesData = [
+    { id: 1, name: "Mały Kret", icon: "🐭", mining: 1, speed: 1, strength: 1, cost: 10, level: 1, exp: 0, unloadTime: 1.5, spritePrefix: 'k', spriteNumber: 1 },
+    { id: 2, name: "Prosty Kret", icon: "🐹", mining: 2, speed: 1.05, strength: 1, cost: 20, level: 1, exp: 0, unloadTime: 1.2, spritePrefix: 'k', spriteNumber: 2 },
+    { id: 3, name: "Ślepy Kret", icon: "🐁", mining: 3, speed: 1.1, strength: 1, cost: 40, level: 1, exp: 0, unloadTime: 1, spritePrefix: 'k', spriteNumber: 3 }
+  ];
+  const defaultToolsData = [
+    { id: 1, name: "Łopata +1", icon: "⛏️", bonus: 1, cost: 50 },
+    { id: 2, name: "Młotek +1", icon: "🔨", bonus: 2, cost: 120 },
+    { id: 3, name: "Śrubokręt", icon: "🪛", bonus: 3, cost: 250 }
+  ];
+
+  let heroesData = [];
+  let toolsData = [];
+  let playerDiamonds = 0;
+  const maxTeamSize = 12;
+  let corridors = []; // Będzie dynamicznie rozszerzane
+  let team = []; // Będzie dynamicznie rozszerzane
+  let miningBoostMultiplier = 1;
+  let equippedTools = [];
+  
+  // System transportu diamentów w korytarzu 0
+  let transportDiamonds = 0; // Diamenty na platformie rozładunkowej
+  let safeDiamonds = 0; // Diamenty w sejfie
+  let transportHeroState = "idle"; // idle, moving-to-platform, moving-to-safe, loading, unloading
+  let transportHeroPosition = 0; // Pozycja między platformą (0) a sejfem (1)
+  let transportHeroLoad = 0; // Ile diamentów niesie
+  let transportHeroCapacity = 50; // Pojemność transportu
+  
+  // System wielu kurierów
+  let kurierzyData = [];
+  let kurierzyTeam = [];
+  let kurierzyPurchased = false;
+
+  const playerDiamondsSpan = document.getElementById("player-diamonds");
+  const teamContainer = document.getElementById("team");
+  const btnMine = document.getElementById("btn-mine");
+  const heroesList = document.getElementById("heroes-list");
+  const toolsList = document.getElementById("tools-list");
+  const btnReset = document.getElementById("btn-reset");
+  const popup = document.getElementById("popup");
+  const popupTitle = document.getElementById("popup-title");
+  const popupDesc = document.getElementById("popup-desc");
+  const popupAction = document.getElementById("popup-action");
+  const popupClose = document.getElementById("popup-close");
+
+  // Animacja diamentu wyłączona
+
+  // Zapewnij kontekst pozycjonowania dla sprite'ów
+  teamContainer.style.position = "relative";
+
+  async function loadJSON(url, fallback) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok)
+        throw new Error(`Błąd ładowania ${url}`);
+      return await res.json();
+    } catch (e) {
+      console.warn(e.message);
+      return fallback;
+    }
+  }
+
+  let namesData = { przymiotniki: [], zdrobnienia_imion: [], poziomy: {} };
+
+  async function loadNames() {
+    try {
+      const res = await fetch("names.json");
+      if (!res.ok) throw new Error("Błąd ładowania names.json");
+      namesData = await res.json();
+    } catch (e) {
+      namesData = { przymiotniki: ["Zwinny"], zdrobnienia_imion: ["Krecik"], poziomy: {} };
+    }
+  }
+
+  function generateHeroName() {
+    const adj = namesData.przymiotniki;
+    const im = namesData.zdrobnienia_imion;
+    if (!adj.length || !im.length) return "Bezimienny Kret";
+    const przym = adj[Math.floor(Math.random() * adj.length)];
+    const name = im[Math.floor(Math.random() * im.length)];
+    return `${przym} ${name}`;
+  }
+
+  function createHeroInstance(base) {
+    // Jeśli base ma już instanceName, zachowaj je
+    return {
+      ...JSON.parse(JSON.stringify(base)),
+      instanceName: base.instanceName || generateHeroName(),
+      currentLoad: 0,
+      position: 0,
+      state: "commuting",
+      miningProgress: 0,
+      unloadTimer: 0,
+      justMined: 0,
+      _emittedUnloadFx: false // flaga: sprite tylko raz na rozładunek
+    };
+  }
+
+  function createWindziarzInstance(base) {
+    return {
+      ...JSON.parse(JSON.stringify(base)),
+      id: base.id || `windziarz-${Date.now()}`, // DODAJ TO jeśli nie ma id
+      position: -0.5,
+      target: 0,
+      state: "idle", // idle, moving, loading, returning, unloading
+      carried: 0,
+      loadingTimer: 0,
+      unloadingTimer: 0, // DODAJ TO!
+      exp: base.exp || 0,
+      level: base.level || 1,
+      capacity: base.capacity || 1000,
+      loadingspeed: base.loadingspeed || 50,
+      _spriteAcc: 0,
+      _spriteTimer: 0
+    };
+  }
+
+  function createKurierInstance(kurierBase) {
+    return {
+      ...JSON.parse(JSON.stringify(kurierBase)),
+      position: 0, // Pozycja między platformą (0) a sejfem (1)
+      state: "idle", // idle, moving-to-platform, moving-to-safe, loading, unloading
+      carried: 0,
+      currentLoad: 0,
+      lastLoadingTime: 0,
+      lastUnloadingTime: 0
+    };
+  }
+
+  /**
+   * Asynchronicznie pobiera i wycina bitmapę bohatera z arkusza spritów.
+   *
+   * @param {string} prefix Prefiks nazwy pliku (np. "k").
+   * @param {number} heroNumber Numer bohatera (liczony od 1).
+   * @returns {Promise<ImageBitmap|null>} Obietnica, która zwraca obiekt ImageBitmap
+   * lub null, jeśli wystąpił błąd
+   * (np. zły numer, brak pliku).
+   */
+  async function getHeroBitmap(prefix, heroNumber) {
+    // --- 1. Walidacja danych wejściowych ---
+    if (!prefix || typeof prefix !== 'string' || typeof heroNumber !== 'number' || heroNumber <= 0) {
+      console.error("Błędne parametry wejściowe.");
+      return null;
+    }
+
+    // --- 2. Obliczenia pliku i pozycji sprita ---
+    const SPRITES_PER_ROW = 5;
+    const SPRITES_PER_COLUMN = 4;
+    const SPRITES_PER_FILE = SPRITES_PER_ROW * SPRITES_PER_COLUMN; // 20 spritów na plik
+    const SPRITE_SIZE = 128; // Rozmiar pojedynczego sprita w px
+
+    // Oblicz, w którym pliku znajduje się bohater
+    // Np. bohater 1-20 -> plik 1; bohater 21-40 -> plik 2
+    const fileNumber = Math.ceil(heroNumber / SPRITES_PER_FILE);
+    const imagePath = `images/${prefix}${fileNumber}.png`;
+
+    // Oblicz pozycję (indeks) bohatera w jego pliku (od 0 do 19)
+    const indexInFile = (heroNumber - 1) % SPRITES_PER_FILE;
+
+    // Oblicz współrzędne (x, y) sprita w siatce na arkuszu
+    const sx = (indexInFile % SPRITES_PER_ROW) * SPRITE_SIZE;
+    const sy = Math.floor(indexInFile / SPRITES_PER_ROW) * SPRITE_SIZE;
+
+    // --- 3. Wczytanie obrazu i wycięcie bitmapy ---
+    try {
+      // Stwórz nowy obiekt obrazu w pamięci
+      const image = new Image();
+      image.src = imagePath;
+
+      // Poczekaj na załadowanie obrazu. Jeśli ścieżka jest zła, .onerror odrzuci Promise.
+      await image.decode(); // Nowocześniejsza i bardziej niezawodna alternatywa dla image.onload
+
+      // Wytnij odpowiedni fragment z wczytanego obrazu i stwórz z niego bitmapę
+      // To podejście jest wydajniejsze niż rysowanie na dodatkowym canvasie.
+      const bitmap = await createImageBitmap(image, sx, sy, SPRITE_SIZE, SPRITE_SIZE);
+
+      return bitmap;
+    } catch (error) {
+      // Błąd wystąpi, jeśli plik obrazu nie zostanie znaleziony (błąd 404) lub jest uszkodzony.
+      console.error(`Nie udało się wczytać pliku: ${imagePath}`, error);
+      return null;
+    }
+  }
+
+  function updateDiamondsDisplay() {
+    playerDiamondsSpan.textContent = `💎 Diamenty: ${formatNumber(playerDiamonds)}`;
+    checkElevatorEnabled();
+  }
+  
+  function updateTeamEfficiency() {
+    const totalEfficiencyEl = document.getElementById("total-efficiency");
+    if (!totalEfficiencyEl) return;
+    
+    let totalEfficiency = 0;
+    let activeMiners = 0;
+    
+    for (let i = 0; i < team.length; i++) {
+      const hero = team[i];
+      if (hero && hero.state !== "idle") {
+        const efficiency = calculateMinerEfficiency(hero);
+        totalEfficiency += efficiency.totalEfficiency;
+        activeMiners++;
+      }
+    }
+    
+    totalEfficiencyEl.textContent = formatEfficiency(totalEfficiency);
+    
+    // Dodaj informację o liczbie aktywnych kopaczy
+    const teamEfficiencyEl = document.getElementById("team-efficiency");
+    if (teamEfficiencyEl && activeMiners > 0) {
+      teamEfficiencyEl.innerHTML = `🚀 Wydajność drużyny: <span id="total-efficiency">${formatEfficiency(totalEfficiency)}</span> (${activeMiners} aktywnych)`;
+    }
+  }
+
+  // --- Diamond transfer animation framework ---
+  const DIAMOND_SPRITE_MAX = 30; // Zwiększamy limit, bo animacje są teraz lżejsze
+  let _activeDiamondSprites = 0;
+
+  // spawn n sprites (capped) from startRect to endRect; doesn't affect scroll (position:fixed)
+  function spawnDiamondSprites(startRect, endRect, n, durationOverride, onDiamondReach) {
+    if (!startRect || !endRect || n <= 0) return;
+    
+    const toSpawn = Math.min(Math.round(n), DIAMOND_SPRITE_MAX - _activeDiamondSprites);
+    if (toSpawn <= 0) return;
+
+    const diamondsPerSprite = n / toSpawn;
+    const totalDuration = (typeof durationOverride === 'number' && durationOverride > 0) ? durationOverride : 700;
+    const flyTime = 700; // Stały czas lotu pojedynczego diamentu w ms.
+
+    // Usunięte opóźnienie startu - diamenty startują od razu
+    for (let k = 0; k < toSpawn; k++) {
+      _activeDiamondSprites++;
+      const el = document.createElement('div');
+      el.className = 'diamond-sprite';
+      el.textContent = '💎';
+      
+      const sx = startRect.left + startRect.width / 2;
+      const sy = startRect.top + startRect.height / 2;
+      const ex = endRect.left + endRect.width / 2;
+      const ey = endRect.top + endRect.height / 2;
+
+      el.style.position = 'fixed';
+      el.style.left = sx + 'px';
+      el.style.top = sy + 'px';
+      el.style.zIndex = '14000';
+      el.style.pointerEvents = 'none';
+
+      el.style.setProperty('--dx', `${ex - sx}px`);
+      el.style.setProperty('--dy', `${ey - sy}px`);
+      
+      el.style.animationDuration = `${flyTime}ms`;
+      
+      // Usunięte opóźnienie - diamenty startują natychmiast
+      // el.style.animationDelay = `${delay}ms`;
+
+      document.body.appendChild(el);
+
+      el.addEventListener('animationend', () => {
+        el.remove();
+        _activeDiamondSprites = Math.max(0, _activeDiamondSprites - 1);
+        if (typeof onDiamondReach === 'function') {
+          onDiamondReach(diamondsPerSprite);
+        }
+      });
+    }
+  }
+
+  // helper: spawn sprites given corridor index by locating hero (round) and bucket bar elements in DOM
+  function animateTransferInCorridor(corridorIndex, amount, durationMs) {
+    try {
+      const corridorEl = teamContainer.querySelector(`[data-corridor-index="${corridorIndex}"]`);
+      if (!corridorEl) return;
+      // use the round hero position as the start (reliable visual) and the bucket bar as the end
+      const heroPosEl = corridorEl.querySelector('.hero-position');
+      const bucketBarEl = corridorEl.querySelector('.bucket .bucket-bar');
+      // fall back to previous elements if these are missing
+      const heroEl = heroPosEl || corridorEl.querySelector('.hero-info .hero-icon');
+      const bucketEl = bucketBarEl || corridorEl.querySelector('.bucket .bucket-icon') || corridorEl.querySelector('.bucket');
+      if (!heroEl || !bucketEl) return;
+      const heroRect = heroEl.getBoundingClientRect();
+      const bucketRect = bucketEl.getBoundingClientRect();
+      console.debug('animateTransferInCorridor', { corridorIndex, amount, durationMs, heroRect, bucketRect, heroEl, bucketEl });
+      
+      const corridor = corridors[corridorIndex];
+      const onDiamondReach = (value) => {
+        if (corridor) {
+          const cap = corridor.bucketCapacity || 100;
+          const space = Math.max(0, cap - (corridor.bucketAmount || 0));
+          const transfer = Math.min(value, space);
+          corridor.bucketAmount = (corridor.bucketAmount || 0) + transfer;
+        }
+      };
+      spawnDiamondSprites(heroRect, bucketRect, amount, durationMs, onDiamondReach);
+    } catch (e) { console.warn('animateTransfer err', e); }
+  }
+  // --- end animation framework ---
+
+  function renderTeam() {
+    teamContainer.innerHTML = "";
+    for (let i = 0; i < corridors.length; i++) {
+      const corridor = corridors[i];
+      const hero = team[i];
+      const maxWallHP = corridor.wallHP + 2000;
+      
+      // Oblicz aktualną wydajność dla aktywnego kopacza
+      let currentEfficiency = 0;
+      if (hero && hero.state !== "idle") {
+        const efficiency = calculateMinerEfficiency(hero);
+        currentEfficiency = efficiency.totalEfficiency;
+      }
+
+      const corridorEl = document.createElement("section");
+      corridorEl.className = "corridor";
+      corridorEl.dataset.corridorIndex = i;
+      corridorEl.setAttribute("role", "listitem");
+      corridorEl.setAttribute("aria-label", hero ? `Korytarz z bohaterem ${hero.name}` : "Wolny korytarz");
+      corridorEl.style.position = "relative";
+
+
+
+      if (i > 0) {
+        const destroyBtn = document.createElement('button');
+        destroyBtn.textContent = '💥';
+        destroyBtn.title = 'Zburz korytarz';
+        destroyBtn.style.position = 'absolute';
+        destroyBtn.style.top = '2px';
+        destroyBtn.style.right = '5px';
+        destroyBtn.style.zIndex = '10';
+        destroyBtn.style.background = 'none';
+        destroyBtn.style.border = 'none';
+        destroyBtn.style.fontSize = '1.2rem';
+        destroyBtn.style.cursor = 'pointer';
+        destroyBtn.style.padding = '0';
+        destroyBtn.onclick = (e) => {
+          e.stopPropagation();
+          destroyCorridor(i);
+        };
+        corridorEl.appendChild(destroyBtn);
+      }
+
+           
+      const heroInfo = document.createElement("div");
+      heroInfo.className = "hero-info";
+      if (hero) {
+        // Dodaj klasę poziomu do hero-info
+        const heroLevel = Math.min(10, hero.level || 1);
+        heroInfo.classList.add(`hero-level-${heroLevel}`);
+        
+        heroInfo.style.cursor = "pointer";
+        
+        // Połącz obie funkcjonalności w jeden onclick
+        heroInfo.onclick = (e) => {
+          e.stopPropagation();
+          const isExpanded = heroInfo.classList.contains('expanded');
+          
+          // Zamknij wszystkie inne rozwinięte panele
+          document.querySelectorAll('.hero-info.expanded').forEach(el => {
+            if (el !== heroInfo) {
+              el.classList.remove('expanded');
+            }
+          });
+          
+          // Przełącz stan bieżącego panelu
+          if (isExpanded) {
+            heroInfo.classList.remove('expanded');
+          } else {
+            heroInfo.classList.add('expanded');
+          }
+          
+          // Dodaj obwolutę poziomu do ikony
+          const levelFrame = document.createElement("div");
+          levelFrame.className = "hero-icon-level-frame";
+          icon.appendChild(levelFrame);
+          
+          // Pokaż popup z informacjami o bohaterze
+          showHeroPopup(hero, i);
+        };
+
+        // Dodaj obwolutę
+        const heroFrame = document.createElement('div');
+        heroFrame.className = `hero-frame hero-level-${Math.min(10, hero.level)}`;
+
+        const icon = document.createElement("div");
+        icon.className = "hero-icon";
+
+        if (typeof hero.spriteNumber === 'number') {
+          icon.textContent = hero.icon; // Fallback na czas ładowania
+          (async () => {
+            const bitmap = await getHeroBitmap('k', hero.spriteNumber);
+            if (bitmap && icon.isConnected) {
+              const canvas = document.createElement('canvas');
+              canvas.style.width = "100%";
+              canvas.style.height = "100%";
+              canvas.style.objectFit = "cover";
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+              icon.innerHTML = ''; // Wyczyść fallback
+              icon.appendChild(canvas);
+            }
+          })();
+        } else if (hero.image) {
+          const img = document.createElement("img");
+          img.src = `images/${hero.image}`;
+          img.alt = hero.name;
+          img.style.width = "100%";
+          img.style.height = "100%";
+          img.style.objectFit = "cover";
+          img.onerror = () => {
+            img.remove();
+            icon.textContent = hero.icon;
+          };
+          icon.appendChild(img);
+        } else {
+          icon.textContent = hero.icon;
+        }
+
+        const nameContainer = document.createElement("div");
+        nameContainer.className = "hero-name-container";
+        
+        const heroInstanceName = document.createElement("div");
+        heroInstanceName.className = "hero-instance-name";
+        
+        // Dodaj nazwę i etykietę poziomu
+        const levelName = namesData.poziomy?.[heroLevel]?.nazwa || `Poziom ${heroLevel}`;
+        heroInstanceName.innerHTML = `
+          ${hero.instanceName}
+          <span class="hero-level-badge">${levelName}</span>
+        `;
+        nameContainer.appendChild(heroInstanceName);
+        
+        // Dodaj nazwę poziomu pomiędzy nazwą a typem
+        const heroLevelName = document.createElement("div");
+        heroLevelName.className = "hero-level-name";
+        heroLevelName.textContent = levelName;
+        nameContainer.appendChild(heroLevelName);
+        
+        // Debug - sprawdź czy element jest dodany
+        console.log('Added hero level name:', levelName);
+        console.log('Hero level name element:', heroLevelName);
+        console.log('Name container children:', nameContainer.children.length);
+
+        const heroClassName = document.createElement("div");
+        heroClassName.className = "hero-class-name";
+        heroClassName.textContent = hero.name;
+        nameContainer.appendChild(heroClassName);
+        
+        // Dodaj szczegółowe informacje
+        const heroDetails = document.createElement("div");
+        heroDetails.className = "hero-details";
+        
+        // Oblicz wydajność kopacza
+        const efficiency = calculateMinerEfficiency(hero);
+        
+        heroDetails.innerHTML = `
+          <div class="hero-stat">
+            <span class="hero-stat-label">Poziom:</span>
+            <span class="hero-stat-value">${hero.level || 1}</span>
+          </div>
+          <div class="hero-stat">
+            <span class="hero-stat-label">Doświadczenie:</span>
+            <span class="hero-stat-value">${hero.exp || 0}/100</span>
+          </div>
+          <div class="hero-stat">
+            <span class="hero-stat-label">Siła kopania:</span>
+            <span class="hero-stat-value">${hero.mining || 1}</span>
+          </div>
+          <div class="hero-stat">
+            <span class="hero-stat-label">Prędkość:</span>
+            <span class="hero-stat-value">${(hero.speed || 1).toFixed(2)}</span>
+          </div>
+          <div class="hero-stat">
+            <span class="hero-stat-label">Siła:</span>
+            <span class="hero-stat-value">${hero.strength || 1}</span>
+          </div>
+          <div class="hero-stat efficiency-stat">
+            <span class="hero-stat-label">Wydajność:</span>
+            <span class="hero-stat-value efficiency-value">${formatEfficiency(efficiency.totalEfficiency)}</span>
+          </div>
+        `;
+        nameContainer.appendChild(heroDetails);
+        
+        heroInfo.appendChild(icon);
+        heroInfo.appendChild(nameContainer);
+        heroInfo.appendChild(heroFrame);
+      } else {
+        // Korytarz zero - bez tekstów
+        // Usunięte: heroInfo.textContent = "(wolny korytarz)";
+        // Usunięte: heroInfo.style.justifyContent = "center";
+        // Usunięte: heroInfo.style.color = "#999";
+        
+        // Pozostaw pusty korytarz bez tekstów
+      }
+      corridorEl.appendChild(heroInfo);
+
+      if (i > 0) {
+        // wiadro na diamenty między bohaterem a korytarzem
+        const bucketEl = document.createElement('div');
+        bucketEl.className = 'bucket';
+
+        // Dodaj klasę "full" gdy wiadro jest pełne
+        if ((corridor.bucketAmount || 0) >= (corridor.bucketCapacity || 100)) {
+          bucketEl.classList.add('full');
+        }
+
+        const bIcon = document.createElement('div'); 
+        bIcon.className = 'bucket-icon'; 
+        bIcon.textContent = '🪣'; // Ikona wiadra
+
+        const bCap = document.createElement('div'); 
+        bCap.className = 'bucket-cap'; 
+        bCap.textContent = `${formatNumber(corridor.bucketAmount || 0)}/${formatNumber(corridor.bucketCapacity || 100)}`;
+
+        const bBar = document.createElement('div'); 
+        bBar.className = 'bucket-bar';
+        const bFill = document.createElement('div'); 
+        bFill.className = 'bucket-fill';
+        const fillPct = Math.round(((corridor.bucketAmount || 0) / (corridor.bucketCapacity || 1)) * 100);
+        bFill.style.width = `${fillPct}%`;
+        bBar.appendChild(bFill);
+
+        bucketEl.appendChild(bIcon);
+        bucketEl.appendChild(bBar);
+        bucketEl.appendChild(bCap);
+        // tooltip + lepsze zachowanie kliknięcia
+        bucketEl.title = 'Opróżnij wiadro (klik)';
+        bucketEl.style.padding = '4px 6px';
+        // upewnij się, że ikona nie blokuje kliknięcia
+        bIcon.style.pointerEvents = 'none';
+        bucketEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          const amt = corridor.bucketAmount || 0;
+          if (amt <= 0) return;
+          playerDiamonds += amt;
+          corridor.bucketAmount = 0;
+          updateDiamondsDisplay();
+          saveGame();
+          renderTeam();
+        });
+        corridorEl.appendChild(bucketEl);
+      } else {
+        // Korytarz zero - bez tekstów
+        // Usunięte: const storageArea = document.createElement("div");
+        // Usunięte: storageArea.id = 'storage-area';
+        // Usunięte: storageArea.textContent = 'Miejsce składowania';
+        // Usunięte: storageArea.style.textAlign = 'center';
+        // Usunięte: storageArea.style.padding = '10px';
+        // Usunięte: storageArea.style.color = '#ccc';
+        // Usunięte: storageArea.style.width = '100%';
+        // Usunięte: corridorEl.appendChild(storageArea);
+      }
+
+      if (i === 0) {
+        // Korytarz 0 - platforma rozładunkowa po lewej + kurierzy w środku + sejf po prawej
+        
+        // Platforma rozładunkowa po lewej stronie
+        const unloadingPlatform = document.createElement("div");
+        unloadingPlatform.className = "unloading-platform";
+        unloadingPlatform.innerHTML = `
+          <div class="platform-icon">🚚</div>
+          <div class="platform-label">Platforma</div>
+          <div class="platform-diamonds">${formatNumber(transportDiamonds)}</div>
+        `;
+        corridorEl.appendChild(unloadingPlatform);
+
+        // Kurierzy w środku
+        if (kurierzyTeam.length > 0) {
+          kurierzyTeam.forEach((kurier, index) => {
+            const kurierEl = document.createElement("div");
+            kurierEl.className = "kurier";
+            kurierEl.style.position = "absolute";
+            kurierEl.style.left = `${kurier.position * 100}%`;
+            kurierEl.style.top = `${20 + index * 30}px`;
+            kurierEl.style.transform = "translate(-50%, -50%)";
+            kurierEl.style.zIndex = "10";
+            
+            kurierEl.innerHTML = `
+              <div class="kurier-icon">${kurier.icon}</div>
+              <div class="kurier-load">${formatNumber(kurier.currentLoad)}/${formatNumber(kurier.capacity)}</div>
+            `;
+            
+            // Dodaj wskaźnik stanu
+            const stateColors = { 
+              'idle': '#9ca3af', 
+              'moving-to-platform': '#ffd166', 
+              'loading': '#06d6a0', 
+              'moving-to-safe': '#118ab2', 
+              'unloading': '#ef476f' 
+            };
+            kurierEl.style.background = stateColors[kurier.state] || '#ffffff';
+            kurierEl.style.border = `2px solid ${stateColors[kurier.state] || '#000000'}`;
+            kurierEl.style.borderRadius = "8px";
+            kurierEl.style.padding = "4px 8px";
+            kurierEl.style.fontSize = "0.8rem";
+            kurierEl.style.color = "#ffffff";
+            kurierEl.style.textAlign = "center";
+            kurierEl.style.minWidth = "60px";
+            
+            // Dodaj kliknięcie na kuriera
+            kurierEl.onclick = () => {
+              showKurierPopup(kurier);
+            };
+            
+            corridorEl.appendChild(kurierEl);
+          });
+        } else {
+          // Pokaż informację o braku kurierów
+          const noKurierInfo = document.createElement("div");
+          noKurierInfo.className = "no-kurier-info";
+          noKurierInfo.innerHTML = `
+            <div style="text-align: center; color: #999; padding: 20px;">
+              <div>🚚</div>
+              <div>Kup kuriera aby transportować diamenty</div>
+            </div>
+          `;
+          corridorEl.appendChild(noKurierInfo);
+        }
+
+        // Sejf po prawej stronie
+        const safeEl = document.createElement("div");
+        safeEl.className = "safe";
+        safeEl.innerHTML = `
+          <div class="safe-icon">🏦</div>
+          <div class="safe-label">Sejf</div>
+          <div class="safe-diamonds">${formatNumber(safeDiamonds)}</div>
+        `;
+        safeEl.style.cursor = "pointer";
+        safeEl.title = "Kliknij aby pobrać diamenty";
+        safeEl.onclick = () => {
+          if (safeDiamonds > 0) {
+            playerDiamonds += safeDiamonds;
+            safeDiamonds = 0;
+            updateDiamondsDisplay();
+            saveGame();
+            renderTeam();
+          }
+        };
+        corridorEl.appendChild(safeEl);
+      } else {
+        // Prawdziwy korytarz z ścianą do kopania
+        const wall = document.createElement("div");
+        wall.className = "wall";
+      const wallFill = document.createElement("div");
+      wallFill.className = "wall-fill";
+      // renderowanie przesuwającej się ściany opartej na remainingDiamonds
+      const maxD = corridor.maxDiamonds || 100;
+      const remD = Math.max(0, Math.min(maxD, corridor.remainingDiamonds ?? maxD));
+      const leftRatio = (corridor.wallStart || 0.1) + (1 - remD / maxD) * (1 - (corridor.wallStart || 0.1));
+      const leftPct = (leftRatio * 100).toFixed(3);
+      const widthPct = Math.max(0, ((1 - leftRatio) * 100).toFixed(3));
+      wallFill.style.position = 'absolute';
+      wallFill.style.left = leftPct + '%';
+      wallFill.style.width = widthPct + '%';
+      // etykieta pokazująca pozostałe diamenty - umieszczona wewnątrz niebieskiej części (.wall-fill)
+      const wallLabel = document.createElement('div');
+      wallLabel.className = 'wall-label';
+      wallLabel.textContent = `${formatNumber(remD)}/${formatNumber(maxD)}`;
+      // ustawienie wewnątrz .wall-fill, wyrównane do prawej krawędzi fill (mały offset)
+      wallLabel.style.right = '6px';
+      wallLabel.style.left = 'auto';
+      wallLabel.style.transform = 'translateY(-50%)';
+      wallLabel.style.pointerEvents = 'none';
+      wallFill.appendChild(wallLabel);
+      wall.appendChild(wallFill);
+
+      if (hero) {
+        const heroPos = document.createElement("div");
+        heroPos.className = "hero-position";
+        heroPos.style.overflow = "hidden";
+        heroPos.style.display = "flex";
+        heroPos.style.alignItems = "center";
+        heroPos.style.justifyContent = "center";
+        heroPos.style.fontSize = "1rem";
+
+        const icon = document.createElement("div");
+        icon.textContent = hero.icon;
+        icon.style.userSelect = "none";
+        icon.style.transform = "scale(1.5)";
+        icon.style.lineHeight = "1";
+        icon.style.pointerEvents = "none";
+
+        // kolory dla poszczególnych faz
+        const stateColors = { commuting: '#ffd166', mining: '#06d6a0', transporting: '#118ab2', unloading: '#ef476f', idle: '#9ca3af' };
+        const stateBorders = { commuting: '#b58300', mining: '#0aa372', transporting: '#095a80', unloading: '#c11237', idle: '#6b7280' };
+        const bg = stateColors[hero.state] || '#ffffff';
+        const bd = stateBorders[hero.state] || '#0c80a6';
+        heroPos.style.background = bg;
+        heroPos.style.borderColor = bd;
+        // kontrast dla ikony (żółty -> ciemny, pozostałe -> biały)
+        icon.style.color = (hero.state === 'commuting' || hero.state === 'idle') ? '#121212' : '#ffffff';
+
+        heroPos.appendChild(icon);
+
+        if (hero.state === "unloading" || hero.state === "idle") {
+          // idle i unloading stoją na początku kopalni
+          heroPos.style.left = "0%";
+          heroPos.classList.add("unloading");
+        } else {
+          heroPos.classList.remove("unloading");
+          let progressRatio = 0;
+          if (hero.state === "commuting") progressRatio = Math.min(1, hero.position / 100);
+          else if (hero.state === "mining") progressRatio = leftRatio; // podczas kopania stoi przy ścianie
+          else if (hero.state === "transporting") progressRatio = Math.min(1, hero.position / 100);
+          heroPos.style.left = `${progressRatio * 100}%`;
+        }
+
+        wall.appendChild(heroPos);
+      }
+      corridorEl.appendChild(wall);
+      }
+
+      if (i > 0) {
+        // Pasek postępu tylko dla prawdziwych korytarzy
+        const progressBarContainer = document.createElement("div");
+        progressBarContainer.className = "progress-container";
+        corridorEl.appendChild(progressBarContainer);
+
+        const progressBarFill = document.createElement("div");
+        progressBarFill.className = "progress-fill";
+        progressBarFill.style.width = "0%";
+        progressBarContainer.appendChild(progressBarFill);
+        
+        // Dodaj wskaźnik wydajności dla aktywnego kopacza
+        if (hero && currentEfficiency > 0) {
+          const efficiencyIndicator = document.createElement("div");
+          efficiencyIndicator.className = "efficiency-indicator";
+          efficiencyIndicator.innerHTML = `
+            <span class="efficiency-label">Wydajność:</span>
+            <span class="efficiency-rate">${formatEfficiency(currentEfficiency)}</span>
+          `;
+          efficiencyIndicator.style.position = "absolute";
+          efficiencyIndicator.style.bottom = "5px";
+          efficiencyIndicator.style.right = "5px";
+          efficiencyIndicator.style.background = "rgba(0,0,0,0.8)";
+          efficiencyIndicator.style.color = "#fff";
+          efficiencyIndicator.style.padding = "4px 8px";
+          efficiencyIndicator.style.borderRadius = "12px";
+          efficiencyIndicator.style.fontSize = "0.8rem";
+          efficiencyIndicator.style.fontWeight = "bold";
+          efficiencyIndicator.style.zIndex = "10";
+          corridorEl.appendChild(efficiencyIndicator);
+        }
+
+        if (hero && hero.state === "mining") {
+          // używamy currentLoad/strength aby pasek postępu był płynny
+          const percent = Math.min(100, ((hero.currentLoad || 0) / (hero.strength || 1)) * 100);
+          progressBarFill.style.width = `${percent}%`;
+        }
+      }
+
+      teamContainer.appendChild(corridorEl);
+    }
+    
+    // Aktualizuj wydajność drużyny po renderowaniu
+    updateTeamEfficiency();
+    
+    renderElevator();
+  }
+
+  function renderElevator() {
+    let elevatorEl = document.getElementById("elevator");
+    const shouldShowElevator = elevatorEnabled || windziarzTeam.length > 0;
+    const appEl = document.getElementById("app");
+    
+    if (!elevatorEl) {
+      elevatorEl = document.createElement("div");
+      elevatorEl.id = "elevator";
+      elevatorEl.style.position = "absolute";
+      elevatorEl.style.width = "48px";
+      elevatorEl.style.background = "linear-gradient(to bottom, #444 80%, #222 100%)";
+      elevatorEl.style.borderRadius = "18px";
+      elevatorEl.style.border = "2px solid #666";
+      elevatorEl.style.display = shouldShowElevator ? "flex" : "none";
+      elevatorEl.style.flexDirection = "column";
+      elevatorEl.style.alignItems = "center";
+      elevatorEl.style.justifyContent = "flex-start";
+      elevatorEl.style.zIndex = "9000";
+      elevatorEl.style.boxShadow = "2px 0 8px #000a";
+      appEl.insertBefore(elevatorEl, document.getElementById("team"));
+      
+      // Dodaj pionowy pasek postępu
+      const progressBar = document.createElement("div");
+      progressBar.className = "elevator-progress-bar";
+      progressBar.id = "elevator-progress-bar";
+      
+      const progressFill = document.createElement("div");
+      progressFill.className = "elevator-progress-fill";
+      progressFill.id = "elevator-progress-fill";
+      
+      progressBar.appendChild(progressFill);
+      elevatorEl.appendChild(progressBar);
+    }
+    
+    // layout and visibility each call
+    appEl.classList.toggle("with-elevator", shouldShowElevator);
+    elevatorEl.style.display = shouldShowElevator ? "flex" : "none";
+    elevatorEl.style.left = "8px";
+    elevatorEl.style.top = teamContainer.offsetTop + "px";
+    elevatorEl.style.height = teamContainer.offsetHeight + "px";
+    
+    if (shouldShowElevator) {
+      // Aktualizuj pionowy pasek postępu
+      updateElevatorProgress();
+      
+      windziarzTeam.forEach((wz) => {
+        let wzNode = document.getElementById(`windziarz-${wz.id}`);
+        if (!wzNode) {
+          elevatorEl.innerHTML = ''; // Wyczyść starych windziarzy przy tworzeniu nowego
+          
+          // Dodaj pionowy pasek postępu ponownie
+          const progressBar = document.createElement("div");
+          progressBar.className = "elevator-progress-bar";
+          progressBar.id = "elevator-progress-bar";
+          
+          const progressFill = document.createElement("div");
+          progressFill.className = "elevator-progress-fill";
+          progressFill.id = "elevator-progress-fill";
+          
+          progressBar.appendChild(progressFill);
+          elevatorEl.appendChild(progressBar);
+          
+          wzNode = document.createElement("div");
+          wzNode.id = `windziarz-${wz.id}`;
+          wzNode.className = "windziarz-pos";
+          wzNode.style.margin = "8px 0";
+          wzNode.style.fontSize = "2rem";
+          wzNode.style.position = "absolute";
+          wzNode.style.left = "50%";
+          wzNode.style.transform = "translateX(-50%)";
+          wzNode.style.cursor = "pointer";
+          wzNode.onclick = () => showWindziarzPopup(wz);
+
+          const wzIcon = document.createElement("div");
+          wzIcon.className = "wz-icon";
+
+          if (wz.image) {
+            const img = document.createElement("img");
+            img.src = `images/${wz.image}`;
+            img.alt = wz.name;
+            img.style.width = "100%";
+            img.style.height = "100%";
+            img.style.objectFit = "cover";
+            img.onerror = () => {
+              img.remove();
+              wzIcon.textContent = wz.icon;
+            };
+            wzIcon.appendChild(img);
+          } else {
+            wzIcon.textContent = wz.icon;
+          }
+          wzNode.appendChild(wzIcon);
+
+          // Dodaj kołowy pasek postępu
+          const progressRing = document.createElement("div");
+          progressRing.className = "windziarz-progress-ring";
+          progressRing.id = `windziarz-progress-${wz.id}`;
+          wzNode.appendChild(progressRing);
+
+          const loadingBar = document.createElement("div");
+          loadingBar.className = "loading-bar";
+          const loadingFill = document.createElement("div");
+          loadingFill.className = "loading-fill";
+          loadingBar.appendChild(loadingFill);
+          wzNode.appendChild(loadingBar);
+          elevatorEl.appendChild(wzNode);
+        }
+
+        // Aktualizuj pozycję i pasek ładowania
+        // Oblicz pozycję na podstawie rzeczywistych wysokości korytarzy
+        let totalHeight = 0;
+        let targetHeight = 0;
+        
+        if (wz.position <= 0) {
+          // Windziarz na górze (sejf)
+          targetHeight = 0;
+        } else {
+          // Windziarz w korytarzu - oblicz wysokość do tego korytarza
+          for (let i = 0; i < Math.min(wz.position, corridors.length); i++) {
+            const corridorEl = teamContainer.querySelector(`[data-corridor-index="${i}"]`);
+            if (corridorEl) {
+              totalHeight += corridorEl.offsetHeight;
+            }
+          }
+          targetHeight = totalHeight;
+        }
+        
+        wzNode.style.top = targetHeight + 12 + "px";
+        
+        // Aktualizuj kołowy pasek postępu
+        updateWindziarzProgress(wz);
+        
+        const loadingBar = wzNode.querySelector('.loading-bar');
+        const loadingFill = wzNode.querySelector('.loading-fill');
+        if (wz.carried > 0) {
+          const fillPercentage = (wz.carried / (wz.capacity || 1000)) * 100;
+          loadingFill.style.width = `${fillPercentage}%`;
+          loadingBar.style.display = 'block';
+        } else {
+          loadingBar.style.display = 'none';
+        }
+      });
+    } else {
+      elevatorEl.innerHTML = "";
+    }
+  }
+
+  // Nowa funkcja do aktualizacji pionowego paska postępu w szybie
+  function updateElevatorProgress() {
+    if (windziarzTeam.length === 0) return;
+    
+    const progressFill = document.getElementById("elevator-progress-fill");
+    if (!progressFill) return;
+    
+    // Znajdź najwyższą pozycję windziarza
+    let maxPosition = 0;
+    windziarzTeam.forEach(wz => {
+      if (wz.position > maxPosition) {
+        maxPosition = wz.position;
+      }
+    });
+    
+    // Oblicz procent wypełnienia na podstawie rzeczywistych wysokości
+    let totalHeight = 0;
+    if (maxPosition > 0) {
+      for (let i = 0; i < Math.min(maxPosition, corridors.length); i++) {
+        const corridorEl = teamContainer.querySelector(`[data-corridor-index="${i}"]`);
+        if (corridorEl) {
+          totalHeight += corridorEl.offsetHeight;
+        }
+      }
+    }
+    
+    const fillPercentage = Math.min(100, (totalHeight / teamContainer.offsetHeight) * 100);
+    
+    progressFill.style.height = `${fillPercentage}%`;
+    
+    // Dodaj klasę active gdy windziarz się porusza
+    if (maxPosition > 0) {
+      progressFill.classList.add('active');
+    } else {
+      progressFill.classList.remove('active');
+    }
+  }
+
+  function showHeroPopup(hero, corridorIndex = null) {
+    const isUpgrade = corridorIndex !== null;
+    const heroData = isUpgrade ? hero : heroesData.find(h => h.id === hero.id);
+    if (!heroData) return;
+
+    const cost = isUpgrade ? (heroData.cost || hero.cost) : heroData.cost;
+    
+    // Oblicz wydajność kopacza
+    const efficiency = calculateMinerEfficiency(heroData);
+
+    popupTitle.textContent = heroData.name + (isUpgrade ? ` (Poziom ${heroData.level})` : '');
+    popupDesc.innerHTML = `
+      <div class="stat">Siła kopania: <b>${heroData.mining}</b></div>
+      <div class="stat">Prędkość: <b>${heroData.speed.toFixed(2)}</b></div>
+      <div class="stat">Siła: <b>${heroData.strength}</b></div>
+      ${isUpgrade ? `<div class="stat">Doświadczenie: <b>${heroData.exp}</b></div>` : ''}
+      <div class="stat">Czas rozładunku: <b>${(heroData.unloadTime || (5 / heroData.strength)).toFixed(2)}s</b></div>
+      <div class="stat efficiency-stat">
+        <span class="stat-label">Wydajność:</span>
+        <span class="stat-value">${formatEfficiency(efficiency.totalEfficiency)}</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Czas cyklu:</span>
+        <span class="stat-value">${efficiency.cycleTime.toFixed(2)}s</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Szczegóły cyklu:</span>
+        <span class="stat-value">
+          🚶 ${efficiency.travelTimeToWall.toFixed(2)}s do ściany<br>
+          ⛏️ ${efficiency.fillTime.toFixed(2)}s kopanie<br>
+          🚶 ${efficiency.travelTimeBack.toFixed(2)}s powrót<br>
+          📦 ${efficiency.unloadTime.toFixed(2)}s rozładunek
+        </span>
+      </div>
+      <hr>
+      <div class="stat">Koszt ${isUpgrade ? 'ulepszenia' : 'zakupu'}: <b>💎 ${formatNumber(cost)}</b></div>
+    `;
+    popupAction.style.display = "block";
+    popupAction.textContent = isUpgrade ? "Ulepsz" : "Kup";
+
+    popupAction.onclick = () => {
+      if (playerDiamonds < cost) {
+        alert("Za mało diamentów.");
+        return;
+      }
+      playerDiamonds -= cost;
+
+      if (isUpgrade) {
+        // Logika ulepszania istniejącego bohatera
+        const heroToUpgrade = team[corridorIndex];
+        heroToUpgrade.level++;
+        heroToUpgrade.mining = Math.floor(heroToUpgrade.mining * 1.1 + 1);
+        heroToUpgrade.strength = Math.floor(heroToUpgrade.strength * 1.1 + 1);
+        heroToUpgrade.speed *= 1.03;
+        heroToUpgrade.cost = Math.floor(cost * 1.15); // Koszt ulepszenia rośnie dla tej instancji
+      } else {
+        // Logika kupowania nowego bohatera
+        let freeSlotIndex = -1;
+        for (let i = 1; i < team.length; i++) {
+          if (team[i] === null) {
+            freeSlotIndex = i;
+            break;
+          }
+        }
+        
+        if (freeSlotIndex === -1) {
+          // Jeśli nie ma wolnego miejsca, dodaj nowy korytarz
+          if (corridors.length >= maxTeamSize) {
+            alert("Osiągnięto maksymalną liczbę korytarzy.");
+            playerDiamonds += cost; // Zwróć diamenty
+            return;
+          }
+
+          // Dodaj nowy korytarz
+          if (addNewCorridor()) {
+            freeSlotIndex = team.length - 1;
+          } else {
+            alert("Nie udało się dodać nowego korytarza.");
+            playerDiamonds += cost;
+            return;
+          }
+        }
+        
+        const newHeroInstance = createHeroInstance(heroData);
+        team[freeSlotIndex] = newHeroInstance;
+        
+        // Ustaw pojemność wiadra na 10x Strength nowego bohatera
+        const newBucketCapacity = (newHeroInstance.strength || 1) * 10;
+        corridors[freeSlotIndex].bucketCapacity = newBucketCapacity;
+        
+        // Zwiększ koszt zakupu w sklepie dla tego typu bohatera
+        heroData.cost = Math.floor(cost * 1.15);
+      }
+
+      updateDiamondsDisplay();
+      saveGame();
+      popup.style.display = "none";
+      renderHeroesShop();
+      renderTeam();
+    };
+
+    popup.style.display = "flex";
+    popup.setAttribute("aria-hidden", "false");
+    popup.querySelector("#popup-content").focus();
+  }
+
+  function createNewCorridor() {
+    return {
+      wallHP: 10000 + Math.floor(Math.random() * 90000),
+      maxDiamonds: getRandomDiamonds(),
+      remainingDiamonds: getRandomDiamonds(),
+      wallStart: 0.1,
+      bucketCapacity: 100, // Domyślna pojemność dla pustych korytarzy
+      bucketAmount: 0
+    };
+  }
+
+  function addNewCorridor() {
+    if (corridors.length >= maxTeamSize) {
+      console.warn("Osiągnięto maksymalną liczbę korytarzy");
+      return false;
+    }
+
+    const newCorridor = createNewCorridor();
+    corridors.push(newCorridor);
+    team.push(null); // Dodaj pusty slot dla kopacza
+
+    console.log(`Dodano nowy korytarz ${corridors.length}. Łączna liczba: ${corridors.length}`);
+    return true;
+  }
+
+  function initializeFirstCorridor() {
+    // Zawsze zaczynamy z jednym korytarzem (korytarz 0)
+    if (corridors.length === 0) {
+      addNewCorridor();
+    }
+  }
+
+  function updateTransportSystem(dt) {
+    console.log("updateTransportSystem wywołane, dt:", dt);
+    console.log("kurierzyTeam:", kurierzyTeam);
+    console.log("kurierzyPurchased:", kurierzyPurchased);
+    
+    // Sprawdź czy są kupione kurierzy
+    Object.entries(kurierzyPurchased).forEach(([id, count]) => {
+        console.log(`Kupiony kurier ${id}: ${count} sztuk`);
+    });
+    
+    if (kurierzyTeam.length === 0) {
+        console.log("Brak kurierów w teamie - sprawdź czy kupiłeś jakiegoś");
+        return;
+    }
+    
+    // Aktualizuj kurierów
+    kurierzyTeam.forEach((kurier, index) => {
+        console.log(`Aktualizuję kuriera ${index}:`, kurier);
+        updateKurier(kurier, dt);
+    });
+    
+    // ... existing code ...
+  }
+
+  function updateKurier(kurier, dt) {
+    const kurierEl = document.getElementById(`kurier-${kurier.id}`);
+    if (!kurierEl) {
+        console.log(`Kurier ${kurier.id}: Nie znaleziono elementu DOM`);
+        return;
+    }
+
+    // Logika stanów kuriera
+    switch (kurier.state) {
+        case "idle":
+            console.log(`Kurier ${kurier.id}: Sprawdzam czy są diamenty na platformie: ${gameState.platformDiamonds}`);
+            if (gameState.platformDiamonds > 0) {
+                console.log(`Kurier ${kurier.id}: Przechodzę do stanu moving, target=platform`);
+                kurier.state = "moving";
+                kurier.target = "platform";
+                kurier.direction = "left";
+                kurier.progress = 0;
+            }
+            break;
+            
+        case "moving-to-platform":
+            console.log(`Kurier ${kurier.id}: Przechodzę ze stanu moving-to-platform do moving`);
+            kurier.state = "moving";
+            kurier.target = "platform";
+            kurier.direction = "left";
+            kurier.progress = 0;
+            console.log(`Kurier ${kurier.id}: Stan zmieniony na: ${kurier.state}`);
+            break;
+            
+        case "moving":
+            console.log(`Kurier ${kurier.id}: Poruszam się, progress=${kurier.progress}, direction=${kurier.direction}`);
+            const moveSpeed = (kurier.speed || 1.0) * dt;
+            kurier.progress += moveSpeed;
+            console.log(`Kurier ${kurier.id}: Nowy progress=${kurier.progress}, moveSpeed=${moveSpeed}`);
+            
+            if (kurier.progress >= 1.0) {
+                kurier.progress = 1.0;
+                if (kurier.target === "platform") {
+                    console.log(`Kurier ${kurier.id}: Dotarłem do platformy, przechodzę do loading`);
+                    kurier.state = "loading";
+                } else {
+                    console.log(`Kurier ${kurier.id}: Dotarłem do sejfu, przechodzę do unloading`);
+                    kurier.state = "unloading";
+                }
+            }
+            break;
+            
+        case "loading":
+            console.log(`Kurier ${kurier.id}: Ładuję diamenty z platformy`);
+            const loadAmount = Math.min(gameState.platformDiamonds, kurier.capacity);
+            console.log(`Kurier ${kurier.id}: loadAmount=${loadAmount}, platformDiamonds=${gameState.platformDiamonds}, capacity=${kurier.capacity}`);
+            if (loadAmount > 0) {
+                gameState.platformDiamonds -= loadAmount;
+                kurier.carried = loadAmount;
+                console.log(`Kurier ${kurier.id}: Załadowano ${loadAmount} diamentów, przechodzę do sejfu`);
+                kurier.state = "moving";
+                kurier.target = "safe";
+                kurier.direction = "right";
+                kurier.progress = 0;
+                updatePlatformCounter();
+            }
+            break;
+            
+        case "unloading":
+            console.log(`Kurier ${kurier.id}: Rozładowuję diamenty do sejfu, carried=${kurier.carried}`);
+            if (kurier.carried > 0) {
+                gameState.diamonds += kurier.carried;
+                console.log(`Kurier ${kurier.id}: Rozładowano ${kurier.carried} diamentów do sejfu`);
+                kurier.carried = 0;
+                kurier.state = "moving";
+                kurier.target = "platform";
+                kurier.direction = "left";
+                kurier.progress = 0;
+            }
+            break;
+            
+        default:
+            console.log(`Kurier ${kurier.id}: Nieznany stan: ${kurier.state}`);
+            break;
+    }
+    
+    // Pozycjonowanie kuriera
+    if (kurierEl) {
+        let leftPosition;
+        
+        if (kurier.state === "loading" || kurier.state === "unloading") {
+            if (kurier.target === "platform") {
+                leftPosition = 120;
+            } else if (kurier.target === "safe") {
+                leftPosition = window.innerWidth - 120 - 60;
+            }
+        } else if (kurier.state === "moving") {
+            if (kurier.direction === "right") {
+                leftPosition = 120 + (kurier.progress * (window.innerWidth - 240 - 60));
+            } else {
+                leftPosition = window.innerWidth - 120 - 60 - (kurier.progress * (window.innerWidth - 240 - 60));
+            }
+        }
+        
+        if (leftPosition !== undefined) {
+            console.log(`Kurier ${kurier.id}: Ustawiam pozycję left=${leftPosition}px, stan=${kurier.state}`);
+            kurierEl.style.left = `${leftPosition}px`;
+        } else {
+            console.log(`Kurier ${kurier.id}: Brak pozycji left, stan=${kurier.state}`);
+        }
+    }
+}
+
+  function destroyCorridor(index) {
+    if (index <= 0 || index >= corridors.length) return;
+    if (confirm('Czy na pewno chcesz zburzyć ten korytarz? Bohater i diamenty w wiadrze zostaną utracone!')) {
+      team.splice(index, 1);
+      corridors.splice(index, 1);
+
+      team.push(null);
+      corridors.push(createNewCorridor());
+
+      saveGame();
+      renderTeam();
+    }
+  }
+
+  function showWindziarzPopup(wz) {
+    popupTitle.textContent = wz.name;
+    popupDesc.innerHTML = `
+      <div class="stat">Poziom: <b>${wz.level}</b></div>
+      <div class="stat">Doświadczenie: <b>${wz.exp}</b></div>
+      <div class="stat">Prędkość: <b>${(wz.speed || 1).toFixed(2)}</b></div>
+      <div class="stat">Siła: <b>${wz.strength}</b></div>
+      <div class="stat">Pojemność: <b>${formatNumber(wz.capacity)}</b></div>
+      <div class="stat">Załadunek: <b>${formatNumber(wz.carried)} / ${formatNumber(wz.capacity)}</b></div>
+      <div class="stat">Szybkość ładowania: <b>${wz.loadingspeed} d/s</b></div>
+    `;
+    popupAction.style.display = "none";
+    popup.style.display = "flex";
+    popup.setAttribute("aria-hidden", "false");
+    popup.querySelector("#popup-content").focus();
+  }
+
+  function showWindziarzPurchasePopup(wz) {
+    popupTitle.textContent = wz.name;
+    popupDesc.innerHTML = `
+      <div class="stat">Prędkość: <b>${(wz.speed || 1).toFixed(2)}</b></div>
+      <div class="stat">Pojemność: <b>${formatNumber(wz.capacity)}</b></div>
+      <div class="stat">Szybkość ładowania: <b>${wz.loadingspeed} d/s</b></div>
+      <hr>
+      <div class="stat">Koszt: <b>💎 ${formatNumber(wz.cost)}</b></div>
+    `;
+    popupAction.style.display = "block";
+    popupAction.textContent = "Kup";
+
+    popupAction.onclick = () => {
+      if (playerDiamonds < wz.cost) {
+        alert("Za mało diamentów na zakup windziarza.");
+        return;
+      }
+      
+      playerDiamonds -= wz.cost;
+      windziarzTeam = [createWindziarzInstance(wz)];
+      windziarzPurchased = true;
+      updateDiamondsDisplay();
+      saveGame();
+      popup.style.display = "none";
+      renderWindziarzeShop();
+      renderElevator();
+    };
+
+    popup.style.display = "flex";
+    popup.setAttribute("aria-hidden", "false");
+    popup.querySelector("#popup-content").focus();
+  }
+
+  function showKurierPurchasePopup(kurierData) {
+    popupTitle.textContent = kurierData.name;
+    popupDesc.innerHTML = `
+      <div class="stat">Prędkość: <b>${(kurierData.speed || 1).toFixed(2)}</b></div>
+      <div class="stat">Pojemność: <b>${formatNumber(kurierData.capacity)}</b></div>
+      <div class="stat">Szybkość ładowania: <b>${kurierData.loadingspeed} d/s</b></div>
+      <hr>
+      <div class="stat">Koszt: <b>💎 ${formatNumber(kurierData.cost)}</b></div>
+    `;
+    popupAction.style.display = "block";
+    popupAction.textContent = "Kup";
+
+    popupAction.onclick = () => {
+      if (playerDiamonds < kurierData.cost) {
+        alert("Za mało diamentów na zakup kuriera.");
+        return;
+      }
+      
+      playerDiamonds -= kurierData.cost;
+      kurierzyPurchased[kurierData.id] = (kurierzyPurchased[kurierData.id] || 0) + 1;
+      
+      // Dodaj kuriera do teamu
+      const newKurier = createKurierInstance(kurierData.id);
+      kurierzyTeam.push(newKurier);
+      console.log(`Kurier ${kurierData.id} dodany do teamu:`, newKurier);
+      console.log("kurierzyTeam po dodaniu:", kurierzyTeam);
+      
+      // Zaktualizuj wyświetlanie
+      updateDiamondDisplay();
+      renderKurierzyShop();
+      
+      // Przerenderuj korytarz 0 żeby pokazać nowego kuriera
+      renderCorridor(0);
+    };
+
+    popup.style.display = "flex";
+    popup.setAttribute("aria-hidden", "false");
+    popup.querySelector("#popup-content").focus();
+  }
+
+  function showKurierPopup(kurier) {
+    popupTitle.textContent = kurier.name;
+    popupDesc.innerHTML = `
+      <div class="stat">Poziom: <b>${kurier.level}</b></div>
+      <div class="stat">Doświadczenie: <b>${kurier.exp}</b></div>
+      <div class="stat">Prędkość: <b>${(kurier.speed || 1).toFixed(2)}</b></div>
+      <div class="stat">Pojemność: <b>${formatNumber(kurier.capacity)}</b></div>
+      <div class="stat">Załadunek: <b>${formatNumber(kurier.currentLoad)} / ${formatNumber(kurier.capacity)}</b></div>
+      <div class="stat">Szybkość ładowania: <b>${kurier.loadingspeed} d/s</b></div>
+    `;
+    popupAction.style.display = "none";
+    popup.style.display = "flex";
+    popup.setAttribute("aria-hidden", "false");
+    popup.querySelector("#popup-content").focus();
+  }
+
+  popupClose.onclick = () => {
+    popup.style.display = "none";
+  };
+  popup.addEventListener("click", e => {
+    if (e.target === popup) popup.style.display = "none";
+  });
+
+  function renderHeroesShop() {
+    heroesList.innerHTML = "";
+    for (const heroBase of heroesData) {
+      const item = document.createElement("div");
+      item.className = "shop-item";
+      item.title = heroBase.name;
+
+      const icon = document.createElement("div");
+      icon.className = "shop-icon";
+      icon.textContent = heroBase.icon;
+      item.appendChild(icon);
+
+      const name = document.createElement("div");
+      name.className = "shop-name";
+      name.textContent = heroBase.name;
+      item.appendChild(name);
+
+      const cost = document.createElement("div");
+      cost.className = "shop-cost";
+      cost.textContent = `💎 ${formatNumber(heroBase.cost)}`;
+      item.appendChild(cost);
+
+      item.onclick = () => {
+        // Wywołujemy popup bez indeksu, co oznacza "kupowanie"
+        showHeroPopup(heroBase);
+      };
+
+      heroesList.appendChild(item);
+    }
+  }
+
+  function renderToolsShop() {
+    toolsList.innerHTML = "";
+    for (const tool of toolsData) {
+      const item = document.createElement("div");
+      item.className = "shop-item";
+      item.title = tool.name;
+
+      const icon = document.createElement("div");
+      icon.className = "shop-icon";
+      icon.textContent = tool.icon || "🧰";
+      item.appendChild(icon);
+
+      const name = document.createElement("div");
+      name.className = "shop-name";
+      name.textContent = tool.name;
+      item.appendChild(name);
+
+      const cost = document.createElement("div");
+      cost.className = "shop-cost";
+      cost.textContent = `💎 ${formatNumber(tool.cost)}`;
+      item.appendChild(cost);
+
+      item.onclick = () => {
+        if (playerDiamonds < tool.cost) {
+          alert("Za mało diamentów na zakup.");
+          return;
+        }
+        if (equippedTools.find(t => t.name === tool.name)) {
+          alert("Już masz to narzędzie.");
+          return;
+        }
+        playerDiamonds -= tool.cost;
+        updateDiamondsDisplay();
+        equippedTools.push({ ...tool, durability: 100 });
+        updateMiningBoost();
+        renderToolsShop();
+        saveGame();
+      };
+
+      toolsList.appendChild(item);
+    }
+  }
+
+  function gameLoopStep(dt) {
+    let diamondsGained = 0;
+    for (let i = 0; i < team.length; i++) {
+      const hero = team[i];
+      if (!hero) continue;
+      const corridor = corridors[i];
+      const DIST = 100;
+      const speed = hero.speed * dt * 50;
+
+      switch (hero.state) {
+        case "commuting":
+          hero.position = Math.min(DIST, hero.position + speed);
+          // oblicz pozycję ściany (w tej samej skali co hero.position [0..100])
+          const maxD2 = corridor.maxDiamonds || 100;
+          const remD2 = Math.max(0, Math.min(maxD2, corridor.remainingDiamonds ?? maxD2));
+          const leftRatio2 = (corridor.wallStart || 0.1) + (1 - remD2 / maxD2) * (1 - (corridor.wallStart || 0.1));
+          const targetPos = leftRatio2 * DIST;
+          if (hero.position >= targetPos) {
+            hero.state = "mining";
+            hero.miningProgress = 0;
+            hero.currentLoad = 0;
+            hero.justMined = 0;
+            // ustaw pozycję bohatera dokładnie przy ścianie
+            hero.position = targetPos;
+          }
+          break;
+        case "mining":
+          // odejmuj ilość wykopaną w tej klatce (płynnie)
+          const minedFloat = hero.mining * miningBoostMultiplier * dt;
+          // inkrementuj wewnętrzny licznik (opcjonalnie - do innych mechanik)
+          hero.miningProgress = (hero.miningProgress || 0) + minedFloat;
+          const actualMined = Math.min(minedFloat, corridor.remainingDiamonds || 0);
+          corridor.remainingDiamonds = Math.max(0, (corridor.remainingDiamonds || 0) - actualMined);
+          hero.currentLoad += actualMined;
+          hero.justMined = actualMined;
+
+          const durabilityLoss = actualMined * 0.1;
+          equippedTools.forEach(t => (t.durability = Math.max(0, t.durability - durabilityLoss)));
+          equippedTools = equippedTools.filter(t => t.durability > 0);
+          renderToolsShop();
+
+          if (hero.currentLoad >= hero.strength || (corridor.remainingDiamonds || 0) <= 0) {
+            hero.state = "transporting";
+            // rozpoczynaj transport z pozycji ściany (obliczonej na podstawie remainingDiamonds)
+            const maxD3 = corridor.maxDiamonds || 100;
+            const remD3 = Math.max(0, Math.min(maxD3, corridor.remainingDiamonds ?? maxD3));
+            const leftRatio3 = (corridor.wallStart || 0.1) + (1 - remD3 / maxD3) * (1 - (corridor.wallStart || 0.1));
+            hero.position = Math.round(leftRatio3 * DIST);
+          }
+          break;
+        case "transporting":
+          hero.position = Math.max(0, hero.position - speed);
+          if (hero.position <= 0) {
+            hero.state = "unloading";
+            // ustaw czas rozładunku i zainicjuj wewnętrzne liczniki transferu
+            const ut = (typeof hero.unloadTime === "number") ? hero.unloadTime : 5 / (hero.strength || 1);
+            // FIX: Czas rozładunku proporcjonalny do ładunku, aby utrzymać stałą szybkość
+            const fullLoadAmount = hero.strength || 1;
+            const currentLoad = hero.currentLoad || 0;
+            const timeForLoad = ut * (currentLoad / Math.max(1, fullLoadAmount));
+            // store in seconds for timers
+            hero.unloadTimer = timeForLoad;
+            hero._unloadInitial = timeForLoad;
+            // amount that should be transferred from hero to bucket during unloading
+            hero._unloadRemaining = currentLoad;
+            
+            // Wyczyść ładunek bohatera, bo diamenty są teraz w "locie"
+            const amountToAnimate = hero.currentLoad;
+            hero.currentLoad = 0;
+
+            if (amountToAnimate > 0) {
+              const durMs = (hero.unloadTimer || 1) * 1000;
+              animateTransferInCorridor(i, amountToAnimate, durMs);
+            }
+          }
+          break;
+        case "unloading":
+          // Odejmuj czas od timera
+          if (hero.unloadTimer > 0) {
+            hero.unloadTimer -= dt;
+          }
+
+          // Gdy timer dobiegnie końca, zdecyduj co dalej
+          if (hero.unloadTimer <= 0) {
+            // Sprawdź, czy wiadro ma miejsce i czy są diamenty do wykopania
+            const bucketHasSpace = (corridor.bucketAmount || 0) < (corridor.bucketCapacity || 100);
+            if ((corridor.remainingDiamonds || 0) > 0 && bucketHasSpace) {
+              // Jeśli są diamenty i wiadro ma miejsce - wróć do pracy
+              hero.state = 'commuting';
+            } else {
+              // Jeśli nie ma diamentów lub wiadro jest pełne - przejdź w stan bezczynności
+              hero.state = 'idle';
+            }
+            hero.position = 0;
+            // Wyczyszczenie starych danych o rozładunku
+            hero._unloadInitial = undefined;
+            hero._unloadRemaining = undefined;
+          }
+          break;
+        case "idle":
+          const bucketHasSpace = (corridor.bucketAmount || 0) < (corridor.bucketCapacity || 100);
+          if (bucketHasSpace && (hero.currentLoad || 0) > 0) {
+            // Jeśli wiadro ma miejsce i bohater ma ładunek - rozładuj
+            hero.state = "unloading";
+            const ut = (typeof hero.unloadTime === "number") ? hero.unloadTime : 5 / (hero.strength || 1);
+            // FIX: Wznów rozładunek z proporcjonalnym czasem dla reszty ładunku
+            const fullLoadAmount = hero.strength || 1;
+            const remainingLoad = hero.currentLoad || 0;
+            const timeForRemaining = ut * (remainingLoad / Math.max(1, fullLoadAmount));
+            hero.unloadTimer = timeForRemaining;
+            hero._unloadInitial = timeForRemaining;
+            hero._unloadRemaining = hero.currentLoad || 0;
+            // Wznów także animację dla pozostałych diamentów
+            const totalVisual = Math.min(Math.max(0, Math.round(hero._unloadRemaining || 0)), DIAMOND_SPRITE_MAX);
+            if (totalVisual > 0) {
+              const durMs = (hero.unloadTimer || 1) * 1000;
+              animateTransferInCorridor(i, totalVisual, durMs);
+            }
+          } else if (corridor.remainingDiamonds > 0 && bucketHasSpace) {
+            // Tylko jeśli wiadro ma miejsce i są diamenty do kopania
+            hero.state = "commuting";
+          }
+          // Jeśli wiadro jest pełne - pozostaw w stanie idle
+          break;
+      }
+      if (hero.state !== "idle" && corridor.remainingDiamonds <= 0 && hero.currentLoad === 0) {
+        hero.state = "idle";
+      }
+    }
+    if (diamondsGained > 0) {
+      team.forEach(hero => {
+        if (!hero) return;
+        if (hero.currentLoad === 0 && hero.state === "commuting") {
+          hero.exp = (hero.exp || 0) + 2;
+          if (hero.exp >= 100) {
+            hero.level = (hero.level || 1) + 1;
+            hero.exp -= 100;
+            hero.mining = Math.floor(hero.mining * 1.1 + 1);
+            hero.strength = Math.floor(hero.strength * 1.1 + 1);
+            hero.speed *= 1.03;
+          }
+        }
+      });
+      saveGame();
+    }
+    // rendering jest teraz dławiony w głównej pętli, aby nie niszczyć elementów klikalnych co klatkę
+    windziarzGameLoop(dt);
+  }
+
+  function updateMiningBoost() {
+    miningBoostMultiplier = equippedTools.reduce((acc, t) => acc * (t.bonus || 1), 1);
+  }
+
+  function saveGame() {
+    try {
+      const state = { 
+        playerDiamonds, 
+        team, 
+        corridors, 
+        equippedTools, 
+        windziarzTeam, 
+        windziarzPurchased,
+        kurierzyTeam,
+        kurierzyPurchased,
+        transportDiamonds,
+        safeDiamonds
+      };
+      localStorage.setItem("diamondMineGameState", JSON.stringify(state));
+      localStorage.setItem('platformDiamonds', gameState.platformDiamonds || 0);
+    } catch (e) {
+      console.warn("Błąd zapisu stanu gry", e);
+    }
+  }
+
+  let windziarzeData = [];
+  let windziarzTeam = [];
+  let graConfig = { liftAfterCollectionOf: 1000 };
+  let elevatorEnabled = false;
+  let elevatorDiamonds = 0;
+  let windziarzPurchased = false;
+
+  async function loadGraConfig() {
+    try {
+      const res = await fetch("gra.json");
+      if (!res.ok) throw new Error("Błąd ładowania gra.json");
+      graConfig = await res.json();
+    } catch (e) { graConfig = { liftAfterCollectionOf: 1000 }; }
+  }
+
+  async function loadWindziarze() {
+    try {
+      const res = await fetch("windziarze.json");
+      if (!res.ok) throw new Error("Błąd ładowania windziarze.json");
+      windziarzeData = await res.json();
+    } catch (e) { windziarzeData = []; }
+  }
+
+  async function loadKurierzy() {
+    try {
+      const res = await fetch("kurierzy.json");
+      if (!res.ok) throw new Error("Błąd ładowania kurierzy.json");
+      kurierzyData = await res.json();
+    } catch (e) { kurierzyData = []; }
+  }
+
+  function checkElevatorEnabled() {
+    const shouldBeEnabled = Number(playerDiamonds) >= Number(graConfig.liftAfterCollectionOf) || windziarzPurchased;
+    if (shouldBeEnabled && !elevatorEnabled) {
+      elevatorEnabled = true;
+      const windziarzeShop = document.getElementById("windziarze-shop");
+      if (windziarzeShop) {
+        windziarzeShop.style.display = "block";
+      }
+      renderWindziarzeShop();
+      renderKurierzyShop();
+      renderElevator();
+    }
+  }
+
+  function renderWindziarzeShop() {
+    let shopSection = document.getElementById("windziarze-shop");
+    if (!shopSection) {
+      shopSection = document.createElement("section");
+      shopSection.className = "shop-container";
+      shopSection.id = "windziarze-shop";
+      shopSection.setAttribute("aria-label", "Sklep windziarzy");
+      const title = document.createElement("div");
+      title.className = "shop-title";
+      title.textContent = "Sklep windziarzy";
+      shopSection.appendChild(title);
+      const list = document.createElement("div");
+      list.className = "shop-list";
+      list.id = "windziarze-list";
+      list.setAttribute("role", "list");
+      shopSection.appendChild(list);
+      document.getElementById("app").appendChild(shopSection);
+    }
+    const windziarzeList = document.getElementById("windziarze-list");
+    windziarzeList.innerHTML = "";
+    shopSection.style.display = elevatorEnabled ? "block" : "none";
+    if (!elevatorEnabled) return;
+    for (const wzBase of windziarzeData) {
+      const item = document.createElement("div");
+      item.className = "shop-item";
+      item.title = wzBase.name;
+      const icon = document.createElement("div");
+      icon.className = "shop-icon";
+      if (wzBase.image) {
+        const img = document.createElement("img");
+        img.src = `images/${wzBase.image}`;
+        img.alt = wzBase.name;
+        img.style.width = "58px";
+        img.style.height = "58px";
+        img.style.objectFit = "cover";
+        img.onerror = () => {
+          img.remove();
+          icon.textContent = wzBase.icon;
+        };
+        icon.appendChild(img);
+      } else {
+        icon.textContent = wzBase.icon;
+      }
+      item.appendChild(icon);
+      const name = document.createElement("div");
+      name.className = "shop-name";
+      name.textContent = wzBase.name;
+      item.appendChild(name);
+      const cost = document.createElement("div");
+      cost.className = "shop-cost";
+      cost.textContent = `💎 ${formatNumber(wzBase.cost)}`;
+      item.appendChild(cost);
+      item.onclick = () => {
+        showWindziarzPurchasePopup(wzBase);
+      };
+      windziarzeList.appendChild(item);
+    }
+  }
+
+  function renderKurierzyShop() {
+    let shopSection = document.getElementById("kurierzy-shop");
+    if (!shopSection) {
+      shopSection = document.createElement("section");
+      shopSection.className = "shop-container";
+      shopSection.id = "kurierzy-shop";
+      shopSection.setAttribute("aria-label", "Sklep kurierów");
+      const title = document.createElement("div");
+      title.className = "shop-title";
+      title.textContent = "Sklep kurierów";
+      shopSection.appendChild(title);
+      const list = document.createElement("div");
+      list.className = "shop-list";
+      list.id = "kurierzy-list";
+      list.setAttribute("role", "list");
+      shopSection.appendChild(list);
+      document.getElementById("app").appendChild(shopSection);
+    }
+    const kurierzyList = document.getElementById("kurierzy-list");
+    kurierzyList.innerHTML = "";
+    shopSection.style.display = elevatorEnabled ? "block" : "none";
+    if (!elevatorEnabled) return;
+    for (const kurierBase of kurierzyData) {
+      const item = document.createElement("div");
+      item.className = "shop-item";
+      item.title = kurierBase.name;
+      const icon = document.createElement("div");
+      icon.className = "shop-icon";
+      if (kurierBase.image) {
+        const img = document.createElement("img");
+        img.src = `images/${kurierBase.image}`;
+        img.alt = kurierBase.name;
+        img.style.width = "58px";
+        img.style.height = "58px";
+        img.style.objectFit = "cover";
+        img.onerror = () => {
+          img.remove();
+          icon.textContent = kurierBase.icon;
+        };
+        icon.appendChild(img);
+      } else {
+        icon.textContent = kurierBase.icon;
+      }
+      item.appendChild(icon);
+      const name = document.createElement("div");
+      name.className = "shop-name";
+      name.textContent = kurierBase.name;
+      item.appendChild(name);
+      const cost = document.createElement("div");
+      cost.className = "shop-cost";
+      cost.textContent = `💎 ${formatNumber(kurierBase.cost)}`;
+      item.appendChild(cost);
+      item.onclick = () => {
+        showKurierPurchasePopup(kurierBase);
+      };
+      kurierzyList.appendChild(item);
+    }
+  }
+
+  function updateWindziarzProgress(wz) {
+    const progressRing = document.getElementById(`windziarz-progress-${wz.id}`);
+    if (!progressRing) return;
+
+    let progress = 0;
+    
+    // Usuń wszystkie klasy stanów
+    progressRing.classList.remove('moving', 'loading', 'returning', 'unloading', 'active');
+    
+    switch (wz.state) {
+      case "moving":
+        progressRing.classList.add('moving', 'active');
+        // Postęp ruchu do celu
+        if (wz.target > 0) {
+          progress = Math.min(1, Math.abs(wz.position - wz.target) / Math.abs(wz.target));
+          progress = (1 - progress) * 360; // Konwersja na stopnie (0-360)
+        }
+        break;
+        
+      case "loading":
+        progressRing.classList.add('loading', 'active');
+        // Postęp ładowania
+        if (wz.loadingTimer !== undefined && wz.loadingTimer > 0) {
+          const initialTime = wz.loadingTimer + (wz.carried / (wz.loadingspeed || 50));
+          progress = ((initialTime - wz.loadingTimer) / initialTime) * 360;
+        }
+        break;
+        
+      case "returning":
+        progressRing.classList.add('returning', 'active');
+        // Postęp powrotu do góry na podstawie rzeczywistych wysokości
+        let totalHeight = 0;
+        if (wz.position > 0) {
+          for (let i = 0; i < Math.min(wz.position, corridors.length); i++) {
+            const corridorEl = teamContainer.querySelector(`[data-corridor-index="${i}"]`);
+            if (corridorEl) {
+              totalHeight += corridorEl.offsetHeight;
+            }
+          }
+        }
+        progress = (1 - (totalHeight / teamContainer.offsetHeight)) * 360;
+        break;
+        
+      case "unloading":
+        progressRing.classList.add('unloading', 'active');
+        // Postęp rozładunku
+        if (wz.unloadingTimer !== undefined && wz.unloadingTimer > 0) {
+          const initialTime = wz.unloadingTimer + (wz.carried / (wz.loadingspeed || 50));
+          progress = ((initialTime - wz.unloadingTimer) / initialTime) * 360;
+        }
+        break;
+        
+      default:
+        // Stan idle - bez postępu
+        progress = 0;
+        break;
+    }
+    
+    // Ustaw postęp w CSS
+    progressRing.style.setProperty('--progress', `${progress}deg`);
+  }
+
+  function windziarzGameLoop(dt) {
+    if (!elevatorEnabled) return;
+    
+    for (const wz of windziarzTeam) {
+    console.log(`Windziarz stan: ${wz.state}`);
+      switch (wz.state) {
+        case "idle":
+          wz.position = 0;
+          wz.carried = 0;
+          wz.state = "moving";
+          wz.target = 0;
+          break;
+        case "moving":
+          console.log("Windziarz w stanie moving, carried:", wz.carried, "capacity:", wz.capacity);
+          if (wz.carried >= (wz.capacity || 1000)) {
+            console.log("Windziarz pełny, wraca na górę");
+            wz.state = "returning";
+            wz.target = 0;
+            break;
+          }
+          // szukaj najbliższego wiadra z diamentami od aktualnej pozycji (w dół)
+          let found = false;
+          for (let idx = Math.round(Math.max(1, wz.position)); idx < corridors.length; idx++) {
+            const bucketAmount = corridors[idx].bucketAmount || 0;
+            console.log(`Sprawdzam korytarz ${idx}: ${bucketAmount} diamentów`);
+            if (bucketAmount > 0) {
+              wz.target = idx;
+              found = true;
+              console.log(`Znalazłem wiadro w korytarzu ${idx} z ${bucketAmount} diamentami`);
+              break;
+            }
+          }
+          if (!found) {
+            console.log("Nie znalazłem żadnego wiadra z diamentami");
+            wz.state = "returning";
+            wz.target = 0;
+            break;
+          }
+          // płynny ruch windziarza do wybranego wiadra
+          if (Math.abs(wz.position - wz.target) > 0.01) {
+            wz.position += Math.sign(wz.target - wz.position) * (wz.speed || 1) * dt * 2;
+          } else {
+            wz.position = wz.target;
+            wz.state = "loading";
+            
+            // W stanie "moving", gdy windziarz dociera do wiadra:
+            wz.state = "loading";
+            console.log(`Windziarz przechodzi do stanu loading, target: ${wz.target}`);
+
+            const corridorEl = teamContainer.querySelector(`[data-corridor-index="${wz.target}"]`);
+            const windziarzEl = document.getElementById(`windziarz-${wz.id}`);
+            console.log(`Windziarz Corridor element:`, corridorEl, `Windziarz element:`, windziarzEl);
+
+            if (corridorEl && windziarzEl) {
+                const bucketEl = corridorEl.querySelector('.bucket');
+                const corridor = corridors[wz.target];
+                console.log(`Windziarz Bucket element:`, bucketEl, `Corridor data:`, corridor);
+                
+                if (bucketEl && corridor) {
+                    const startRect = bucketEl.getBoundingClientRect();
+                    const endRect = windziarzEl.getBoundingClientRect();
+                    const amountToLoad = Math.min(corridor.bucketAmount || 0, (wz.capacity || 1000) - (wz.carried || 0));
+                    const loadingSpeed = wz.loadingspeed || 50;
+                    const duration = (amountToLoad / loadingSpeed);
+                    
+                    console.log(`Windziarz Ładowanie: amountToLoad=${amountToLoad}, loadingSpeed=${loadingSpeed}, duration=${duration}s`);
+                    
+                    // Ustaw timer na czas trwania ładowania
+                    wz.loadingTimer = duration;
+                    console.log(`Windziarz Ustawiono loadingTimer: ${wz.loadingTimer}s`);
+                    
+                    // Wyczyść wiadro, diamenty są w locie
+                    corridor.bucketAmount = Math.max(0, corridor.bucketAmount - amountToLoad);
+                    
+                    const onDiamondReach = (value) => {
+                      wz.carried = (wz.carried || 0) + value;
+                      console.log(`Windziarz Diament dotarł, carried: ${wz.carried}`);
+                    };
+                    spawnDiamondSprites(startRect, endRect, amountToLoad, duration * 1000, onDiamondReach);
+                } else {
+                    console.log("Windziarz Brak bucket element lub corridor data");
+                }
+            } else {
+                console.log("Windziarz Nie znaleziono corridor element lub windziarz element");
+            }
+          }
+          break;
+        case "loading":
+          console.log(`Windziarz loading: timer=${wz.loadingTimer}, carried=${wz.carried}, capacity=${wz.capacity}`);
+          // Odejmuj czas od timera
+          if (wz.loadingTimer > 0) {
+            wz.loadingTimer -= dt;
+            console.log(`Windziarz Timer ładowania: ${wz.loadingTimer.toFixed(2)}s`);
+          }
+
+          // Gdy timer dobiegnie końca, zdecyduj co dalej
+          if (wz.loadingTimer <= 0) {
+            console.log("Windziarz Timer ładowania dobiegł końca");
+            const corridor = corridors[wz.target];
+            if (wz.carried >= (wz.capacity || 1000)) {
+                console.log("Windziarz pełny, wraca na górę");
+                wz.state = "returning";
+                wz.target = 0;
+            } else if ((corridor.bucketAmount || 0) <= 0) {
+                console.log("Windziarz Wiado puste, szukam dalej");
+                // Jeśli wiadro jest puste, a my nie jesteśmy pełni, szukaj dalej
+                if (wz.carried < (wz.capacity || 1000) && wz.target < corridors.length - 1) {
+                  wz.state = "moving";
+                  wz.target = wz.target + 1;
+                  console.log(`Windziarz Przechodzę do korytarza ${wz.target}`);
+                } else {
+                  console.log("Windziarz Brak więcej korytarzy, wracam na górę");
+                  wz.state = "returning";
+                  wz.target = 0;
+                }
+            }
+          }
+          break;
+        case "returning":
+          // płynny ruch do góry
+          if (wz.position > 0.01) {
+            wz.position = Math.max(0, wz.position - (wz.speed || 1) * dt * 2);
+          } else {
+            wz.position = 0;
+            wz.state = "unloading";
+            
+            const windziarzEl = document.getElementById(`windziarz-${wz.id}`);
+            if (windziarzEl && wz.carried > 0) {
+                const unloadSpeed = wz.loadingspeed || 50;
+                const amountToUnload = wz.carried;
+                const duration = (amountToUnload / unloadSpeed); // Czas w sekundach
+
+                // Ustaw timer na czas trwania rozładunku
+                wz.unloadingTimer = duration;
+
+                // Rozładuj diamenty na platformę rozładunkową
+                transportDiamonds += amountToUnload;
+                
+                // Wyczyść ładunek
+                wz.carried = 0;
+                
+                // Zapisz grę gdy diamenty trafią na platformę
+                saveGame();
+            } else {
+                // Jeśli nie ma co rozładować, przejdź od razu dalej
+                wz.unloadingTimer = 0;
+                wz.state = "idle";
+            }
+          }
+          break;
+        case "unloading":
+          // Odejmuj czas od timera
+          if (wz.unloadingTimer > 0) {
+            wz.unloadingTimer -= dt;
+          }
+          
+          // Gdy timer dobiegnie końca, przejdź do stanu bezczynności
+          if (wz.unloadingTimer <= 0) {
+            wz.state = "idle";
+            saveGame();
+          }
+          break;
+      }
+    }
+    
+    // Aktualizuj paski postępu tylko gdy coś się zmieniło
+    if (windziarzTeam.length > 0) {
+      windziarzTeam.forEach(wz => {
+        updateWindziarzProgress(wz);
+      });
+      
+      // Aktualizuj pionowy pasek postępu w szybie
+      updateElevatorProgress();
+    }
+  }
+
+  function getRandomDiamonds() {
+    return Math.floor(Math.random() * (100000 - 100 + 1)) + 100;
+  }
+
+  async function init() {
+    await loadGraConfig();
+    await loadWindziarze();
+    await loadKurierzy();
+    console.log("Kurierzy załadowani:", kurierzyData);
+    console.log("kurierzyTeam po załadowaniu:", kurierzyTeam);
+    
+    // Renderuj korytarze
+    console.log("Rozpoczynam renderowanie korytarzy");
+    corridors.forEach((corridor, index) => {
+        console.log(`Renderuję korytarz ${index}`);
+        renderCorridor(index);
+    });
+    
+    await loadNames();
+    heroesData = await loadJSON("heroes.json", defaultHeroesData);
+    toolsData = await loadJSON("items.json", defaultToolsData);
+
+    const savedState = localStorage.getItem("diamondMineGameState");
+    if (savedState) {
+      try {
+        const state = JSON.parse(savedState);
+        playerDiamonds = state.playerDiamonds ?? 0;
+        if (state.corridors && state.team) {
+          for (let i = 0; i < state.corridors.length; i++) {
+            const sc = state.corridors[i];
+            corridors[i] = {
+              wallHP: sc.wallHP ?? (10000 + Math.floor(Math.random() * 90000)),
+              maxDiamonds: sc.maxDiamonds ?? getRandomDiamonds(),
+              remainingDiamonds: (typeof sc.remainingDiamonds === 'number') ? sc.remainingDiamonds : (sc.maxDiamonds ?? getRandomDiamonds()),
+              wallStart: sc.wallStart ?? 0.1,
+              bucketCapacity: sc.bucketCapacity ?? 100,
+              bucketAmount: (typeof sc.bucketAmount === 'number') ? sc.bucketAmount : 0
+            };
+            
+            team[i] = state.team[i] ? { ...state.team[i] } : null;
+            // Uzupełnij brakujące instanceName po wczytaniu starego zapisu
+            if (team[i] && !team[i].instanceName) {
+              team[i].instanceName = generateHeroName();
+            }
+            
+            // Jeśli korytarz ma bohatera, ustaw pojemność wiadra na 10x Strength
+            if (team[i]) {
+              corridors[i].bucketCapacity = (team[i].strength || 1) * 10;
+            }
+          }
+        }
+        equippedTools = state.equippedTools || [];
+        windziarzTeam = (state.windziarzTeam || []).map(w => ({ ...w }));
+        windziarzPurchased = !!state.windziarzPurchased;
+        
+        // Wczytaj system kurierów
+        kurierzyTeam = (state.kurierzyTeam || []).map(k => ({ ...k }));
+        kurierzyPurchased = !!state.kurierzyPurchased;
+        
+        // Wczytaj system transportu
+        transportDiamonds = state.transportDiamonds || 0;
+        safeDiamonds = state.safeDiamonds || 0;
+        
+        updateMiningBoost();
+      } catch {
+        localStorage.removeItem("diamondMineGameState");
+      }
+    } else {
+      // Nowa gra: nie ma zapisanego stanu, więc zaczynamy z pustymi tablicami
+      // Pierwszy korytarz zostanie dodany przez initializeFirstCorridor()
+    }
+    // Dodaj domyślnego bohatera tylko jeśli nie istnieje
+    if (!team.some(h => h)) {
+      // Upewnij się, że mamy pierwszy korytarz
+      initializeFirstCorridor();
+      team[0] = createHeroInstance(heroesData[0]); // Użyj danych z heroes.json
+
+      // Ustaw pojemność wiadra na 10x Strength nowego bohatera
+      const newBucketCapacity = (team[0].strength || 1) * 10;
+      corridors[0].bucketCapacity = newBucketCapacity;
+    }
+    // Upewnij się, że mamy pierwszy korytarz
+    initializeFirstCorridor();
+    
+    updateDiamondsDisplay();
+    renderTeam();
+    renderHeroesShop();
+    renderToolsShop();
+    checkElevatorEnabled();
+    renderWindziarzeShop();
+    renderKurierzyShop();
+    renderElevator();
+    loop();
+  }
+
+  let lastTime = performance.now();
+  let renderAccum = 0;
+  const RENDER_INTERVAL = 0.18; // sekundy (ok. 5-6 FPS dla UI)
+  function loop() {
+    const now = performance.now();
+    const delta = (now - lastTime) / 1000;
+    lastTime = now;
+    gameLoopStep(delta);
+    windziarzGameLoop(delta);
+    updateTransportSystem(delta);
+    renderAccum += delta;
+    if (renderAccum >= RENDER_INTERVAL) {
+      const sx = window.scrollX, sy = window.scrollY;
+      renderTeam();
+      if (window.scrollY !== sy || window.scrollX !== sx) window.scrollTo(sx, sy);
+      renderAccum = 0;
+    }
+    requestAnimationFrame(loop);
+  }
+
+  btnReset.onclick = () => {
+    localStorage.removeItem("diamondMineGameState");
+    location.reload();
+  };
+
+  // --- KOP button delay logic ---
+  const FREE_DIAMONDS_PER_HOUR = 2000;
+  const FREE_DIAMONDS_DELAY = 500; // ms (zmniejszono z 1000)
+  const REFRESH_DELAY = 60 * 60 * 1000; // 60 min in ms
+  let freeDiamonds = FREE_DIAMONDS_PER_HOUR;
+  let lastFreeDiamondsRefill = Date.now();
+  let kopDelayUntil = 0;
+  let kopRefreshUntil = 0;
+
+  function refillFreeDiamondsIfNeeded() {
+    const now = Date.now();
+    if (now - lastFreeDiamondsRefill >= 3600 * 1000) {
+      freeDiamonds = FREE_DIAMONDS_PER_HOUR;
+      lastFreeDiamondsRefill = now;
+      kopRefreshUntil = 0;
+    }
+  }
+
+  function updateKopButtonState() {
+    refillFreeDiamondsIfNeeded();
+    const now = Date.now();
+    let disabled = false;
+    let progress = 0;
+    let label = "Kop";
+    
+    if (kopDelayUntil > now) {
+      disabled = true;
+      progress = 1 - (kopDelayUntil - now) / FREE_DIAMONDS_DELAY;
+      label = `Kop (${Math.ceil((kopDelayUntil-now)/1000)}s)`;
+    } else if (freeDiamonds <= 0) {
+      disabled = true;
+      if (kopRefreshUntil > now) {
+        progress = 1 - (kopRefreshUntil - now) / REFRESH_DELAY;
+        const left = Math.ceil((kopRefreshUntil-now)/1000);
+        label = `Doładowanie za ${Math.floor(left/60)}:${(left%60).toString().padStart(2,'0')}`;
+      } else {
+        // Refill
+        freeDiamonds = FREE_DIAMONDS_PER_HOUR;
+        lastFreeDiamondsRefill = now;
+        kopRefreshUntil = 0;
+        disabled = false;
+        progress = 0;
+        label = "Kop";
+      }
+    }
+    
+    btnMine.disabled = disabled;
+    btnMine.textContent = label;
+    
+    // Aktualizuj pulę diamentów free
+    updateFreeDiamondsPool();
+    
+    // Progress bar in button (istniejący kod)
+    btnMine.style.position = "relative";
+    let progressBar = btnMine.querySelector('.kop-progress');
+    if (!progressBar) {
+      progressBar = document.createElement('div');
+      progressBar.className = 'kop-progress';
+      progressBar.style.position = 'absolute';
+      progressBar.style.left = 0;
+      progressBar.style.top = 0;
+      progressBar.style.height = '100%';
+      progressBar.style.width = '0%';
+      progressBar.style.background = 'rgba(255,255,255,0.18)';
+      progressBar.style.borderRadius = '14px';
+      progressBar.style.pointerEvents = 'none';
+      progressBar.style.transition = 'width 0.2s linear';
+      btnMine.appendChild(progressBar);
+    }
+    progressBar.style.width = Math.round(progress*100) + '%';
+    progressBar.style.display = disabled ? 'block' : 'none';
+  }
+
+  // Nowa funkcja do aktualizacji puli diamentów free
+  function updateFreeDiamondsPool() {
+    let poolContainer = btnMine.querySelector('.free-diamonds-pool');
+    let poolFill = btnMine.querySelector('.free-diamonds-fill');
+    let poolLabel = btnMine.querySelector('.free-diamonds-label');
+    
+    // Stwórz elementy puli jeśli nie istnieją
+    if (!poolContainer) {
+      poolContainer = document.createElement('div');
+      poolContainer.className = 'free-diamonds-pool';
+      btnMine.appendChild(poolContainer);
+      
+      poolFill = document.createElement('div');
+      poolFill.className = 'free-diamonds-fill';
+      poolContainer.appendChild(poolFill);
+      
+      poolLabel = document.createElement('div');
+      poolLabel.className = 'free-diamonds-label';
+      poolContainer.appendChild(poolLabel);
+    }
+    
+    // Oblicz procent wypełnienia puli
+    const poolPercentage = (freeDiamonds / FREE_DIAMONDS_PER_HOUR) * 100;
+    poolFill.style.width = `${poolPercentage}%`;
+    
+    // Aktualizuj etykietę
+    poolLabel.textContent = `${freeDiamonds}/${FREE_DIAMONDS_PER_HOUR}`;
+    
+    // Zmień kolor w zależności od stanu puli
+    if (freeDiamonds <= 0) {
+      poolFill.style.background = '#f44336'; // Czerwony gdy pusta
+      poolLabel.style.color = '#f44336';
+    } else if (freeDiamonds < FREE_DIAMONDS_PER_HOUR * 0.3) {
+      poolFill.style.background = '#ff9800'; // Pomarańczowy gdy mało
+      poolLabel.style.color = '#ff9800';
+    } else {
+      poolFill.style.background = 'linear-gradient(90deg, #4caf50, #8bc34a, #cddc39)'; // Zielony gdy dużo
+      poolLabel.style.color = '#4caf50';
+    }
+  }
+
+  setInterval(updateKopButtonState, 200);
+
+  btnMine.onclick = () => {
+    const now = Date.now();
+    refillFreeDiamondsIfNeeded();
+    if (kopDelayUntil > now || (freeDiamonds <= 0 && kopRefreshUntil > now)) return;
+    
+    if (freeDiamonds > 0) {
+      // Losowo od 1 do 10 diamentów
+      const diamondsToAdd = Math.min(freeDiamonds, Math.floor(Math.random() * 10) + 1);
+      playerDiamonds += diamondsToAdd;
+      freeDiamonds -= diamondsToAdd;
+      kopDelayUntil = now + FREE_DIAMONDS_DELAY;
+      updateDiamondsDisplay();
+      saveGame();
+      
+      try {
+        const startRect = btnMine.getBoundingClientRect();
+        const endRect = playerDiamondsSpan.getBoundingClientRect();
+        
+        // Wyślij dokładnie tyle diamentów ile zostało wygenerowane
+        spawnDiamondSprites(startRect, endRect, diamondsToAdd, 400);
+      } catch {}
+      
+      if (freeDiamonds <= 0) {
+        kopRefreshUntil = now + REFRESH_DELAY;
+      }
+    }
+    updateKopButtonState();
+  };
+
+  window.addEventListener('resize', () => {
+    renderElevator();
+  });
+
+  init();
+
+  function calculateMinerEfficiency(hero) {
+    if (!hero) return 0;
+    
+    // Podstawowe statystyki
+    const miningSpeed = hero.mining || 1; // diamenty na sekundę podczas kopania
+    const movementSpeed = hero.speed || 1; // mnożnik prędkości
+    const strength = hero.strength || 1; // pojemność ładunku
+    const unloadTime = hero.unloadTime || (5 / strength); // czas rozładunku
+    
+    // Długość korytarza (100 jednostek w grze)
+    const corridorLength = 100;
+    // Odległość do ściany (10% długości korytarza + postęp kopania)
+    const wallDistance = corridorLength * 0.1; // 10% długości korytarza
+    
+    // Czas potrzebny na przejście do ściany
+    const travelTimeToWall = wallDistance / (movementSpeed * 50); // 50 to bazowa prędkość w grze
+    
+    // Czas potrzebny na napełnienie wiadra
+    const fillTime = strength / miningSpeed;
+    
+    // Czas potrzebny na powrót do początku
+    const travelTimeBack = wallDistance / (movementSpeed * 50);
+    
+    // Całkowity czas cyklu
+    const totalCycleTime = travelTimeToWall + fillTime + travelTimeBack + unloadTime;
+    
+    // Całkowita wydajność (diamenty na sekundę)
+    const totalEfficiency = strength / totalCycleTime;
+    
+    return {
+      totalEfficiency: totalEfficiency,
+      cycleTime: totalCycleTime,
+      travelTimeToWall: travelTimeToWall,
+      fillTime: fillTime,
+      travelTimeBack: travelTimeBack,
+      unloadTime: unloadTime,
+      details: {
+        miningSpeed: miningSpeed,
+        movementSpeed: movementSpeed,
+        strength: strength,
+        wallDistance: wallDistance
+      }
+    };
+  }
+
+  function formatEfficiency(efficiency) {
+    if (efficiency <= 0) return "0 d/s";
+    if (efficiency < 1) return `${efficiency.toFixed(2)} d/s`;
+    if (efficiency < 10) return `${efficiency.toFixed(1)} d/s`;
+    if (efficiency < 100) return `${Math.round(efficiency)} d/s`;
+    if (efficiency < 1000) return `${Math.round(efficiency)} d/s`;
+    return `${(efficiency / 1000).toFixed(1)}k d/s`;
+  }
+
+  function emptyBucket(corridorIndex) {
+    const corridor = corridors[corridorIndex];
+    if (corridor && corridor.bucketAmount > 0) {
+        const amount = corridor.bucketAmount;
+        corridor.bucketAmount = 0;
+        
+        // Przenieś diamenty do platformy (nie do sejfu)
+        if (!gameState.platformDiamonds) {
+            gameState.platformDiamonds = 0;
+        }
+        gameState.platformDiamonds += amount;
+        
+        // Zaktualizuj licznik platformy
+        updatePlatformCounter();
+        
+        // Animuj przeniesienie diamentów do platformy
+        const bucketEl = document.querySelector(`[data-corridor-index="${corridorIndex}"] .bucket`);
+        const platformEl = document.querySelector('.unloading-platform');
+        
+        if (bucketEl && platformEl) {
+            const startRect = bucketEl.getBoundingClientRect();
+            const endRect = platformEl.getBoundingClientRect();
+            
+            spawnDiamondSprites(startRect, endRect, amount, 1000, () => {
+                console.log(`Windziarz ${amount} diamentów przeniesionych do platformy`);
+            });
+        }
+        
+        // Zaktualizuj wyświetlanie wiadra
+        updateBucketDisplay(corridorIndex);
+    }
+  }
+
+  function updatePlatformCounter() {
+    const counterEl = document.querySelector('.platform-counter');
+    if (counterEl) {
+        counterEl.textContent = `Diamenty: ${gameState.platformDiamonds || 0}`;
+    }
+  }
+
+  // W funkcji renderowania korytarza 0, w miejscu gdzie renderowane są kurierzy
+  if (corridorIndex === 0) {
+    console.log("=== RENDEROWANIE KORYTARZA 0 ===");
+    console.log("kurierzyTeam:", kurierzyTeam);
+    console.log("kurierzyTeam.length:", kurierzyTeam.length);
+    
+    // Renderuj kurierów
+    kurierzyTeam.forEach((kurier, index) => {
+        console.log(`Tworzę element DOM dla kuriera: ${kurier.id}`);
+        const kurierEl = document.createElement('div');
+        kurierEl.id = `kurier-${kurier.id}`;
+        kurierEl.className = 'kurier';
+        kurierEl.innerHTML = kurier.icon || '🏃';
+        kurierEl.onclick = () => showKurierPopup(kurier);
+        
+        // Ustaw początkową pozycję
+        kurierEl.style.left = '120px'; // Przy platformie
+        kurierEl.style.top = `${100 + index * 80}px`;
+        
+        corridorEl.appendChild(kurierEl);
+        console.log(`Kurier ${kurier.id} dodany do DOM, element:`, kurierEl);
+        console.log(`Kurier ${kurier.id} ID:`, kurierEl.id);
+    });
+    
+    console.log("Kurierzy po renderowaniu:", document.querySelectorAll('.kurier'));
+  }
+
+  // ... existing code ...
+  // W funkcji renderCorridor, na początku
+  function renderCorridor(corridorIndex) {
+      if (corridorIndex === 0) {
+          // Tylko w razie problemów
+          // console.log("To jest korytarz 0 - powinienem renderować kurierzy");
+      }
+      
+      // ... existing code ...
+  }
+  // ... existing code ...
+
+  // W funkcji renderowania korytarza 0, gdzie tworzona jest platforma
+  const unloadingPlatform = document.createElement('div');
+  unloadingPlatform.className = 'unloading-platform';
+  unloadingPlatform.innerHTML = `
+      <div>Platforma</div>
+      <div>Rozładunku</div>
+      <div class="platform-counter">Diamenty: ${gameState.platformDiamonds || 0}</div>
+  `;
+
+  // Dodaj kliknięcie w platformę
+  unloadingPlatform.onclick = function() {
+      alert('Kliknięto platformę!'); // Prosty test
+      console.log('=== KLIKNIĘTO PLATFORMĘ ===');
+      
+      if (gameState.platformDiamonds > 0) {
+          const amount = gameState.platformDiamonds;
+          console.log(`Przenoszę ${amount} diamentów z platformy do sejfu`);
+          
+          gameState.platformDiamonds = 0;
+          gameState.diamonds += amount;
+          
+          // Zaktualizuj licznik platformy
+          updatePlatformCounter();
+          
+          // Zaktualizuj wyświetlanie diamentów
+          updateDiamondDisplay();
+          
+          // Animuj przeniesienie diamentów do sejfu
+          const platformEl = document.querySelector('.unloading-platform');
+          const safeEl = document.querySelector('.safe');
+          
+          if (platformEl && safeEl) {
+              const startRect = platformEl.getBoundingClientRect();
+              const endRect = safeEl.getBoundingClientRect();
+              
+              // Sprawdź czy funkcja spawnDiamondSprites istnieje
+              if (typeof spawnDiamondSprites === 'function') {
+                  spawnDiamondSprites(startRect, endRect, amount, 1000, () => {
+                      console.log(`Przeniesiono ${amount} diamentów z platformy do sejfu`);
+                  });
+              } else {
+                  console.error('Funkcja spawnDiamondSprites nie istnieje!');
+                  console.log(`Przeniesiono ${amount} diamentów z platformy do sejfu (bez animacji)`);
+              }
+          } else {
+              console.error('Nie znaleziono elementów platformy lub sejfu');
+          }
+          
+          console.log(`Kliknięto platformę - przeniesiono ${amount} diamentów do sejfu`);
+      } else {
+          console.log('Platforma jest pusta');
+      }
+  };
+
+  console.log('Platforma onclick ustawiony:', unloadingPlatform.onclick);
+
+  // Dodaj cursor pointer do platformy
+  unloadingPlatform.style.cursor = 'pointer';
+
+  // Dodaj platformę do korytarza
+  corridorEl.appendChild(unloadingPlatform);
+  console.log('Platforma dodana do korytarza, element:', unloadingPlatform);
+  // ... existing code ...
+
+})();
+</script>
+</body>
+</html>

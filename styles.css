@@ -1,0 +1,869 @@
+/* --- Podstawowy layout --- */
+body {
+  background-color: #121212;
+  color: white;
+  font-family: Arial, sans-serif;
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Cała aplikacja przewijana */
+#app {
+  flex: 1;
+  overflow-y: auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative; /* <--- dla sprite'ów */
+}
+
+#app.with-elevator {
+  padding-left: 64px; /* miejsce na szyb po lewej stronie */
+}
+@media (max-width: 600px) {
+  #app.with-elevator { padding-left: 56px; }
+}
+
+/* Reset przycisku w rogu */
+#btn-reset {
+  position: absolute;
+  right: 0;
+  top: 8px;
+  background: #e54;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  z-index: 11000;
+  user-select: none;
+}
+
+/* Licznik diamentów zawsze u góry */
+#player-diamonds {
+  font-size: 1.4rem;
+  font-weight: 700;
+  width: 100%;
+  padding: 12px 16px;
+  background: #121212;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  text-align: center;
+  border-bottom: 2px solid #333;
+}
+
+/* Drużyna / korytarze */
+#team {
+  width: 80%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border: none;
+  align-self: flex-start; /* Dodane - zaczyna od lewej strony */
+}
+
+/* Pojedynczy korytarz */
+.corridor {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #222;
+  border-radius: 16px;
+  padding: 10px 12px;
+  min-height: 48px;
+  position: relative;
+}
+
+/* Bohater w korytarzu */
+.hero-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 120px;
+  max-width: 140px;
+  flex-shrink: 0;
+  word-break: break-word;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.hero-info:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.hero-info.expanded {
+  min-width: 200px;
+  max-width: 300px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hero-icon { 
+  font-size: 2.3rem; 
+  flex-shrink: 0;
+}
+
+.hero-name { font-size: 0.85rem; line-height: 1.2; word-wrap: break-word; }
+
+/* Panel z nazwami kopacza */
+.hero-name-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+  height: 3.45rem; /* Zwiększone dla 3 linii */
+  justify-content: flex-start;
+  /* overflow: hidden; */ /* Tymczasowo usunięte dla debugowania */
+}
+
+.hero-info.expanded .hero-name-container {
+  height: auto;
+  min-height: 3.45rem;
+}
+
+/* Nazwa poziomu kopacza */
+.hero-level-name {
+  font-size: 0.6rem;
+  line-height: 1;
+  /* color: #06d6a0; */ /* Usunięte - teraz kolor zależy od poziomu */
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 1.1rem;
+  display: flex;
+  align-items: flex-start;
+  font-style: italic; /* Kursywa dla wyróżnienia */
+  opacity: 0.9;
+}
+
+/* Style dla poziomów kopaczy */
+.hero-instance-name {
+  font-size: 0.7rem;
+  line-height: 1;
+  /* color: #ffd166; */ /* Usunięte - teraz kolor zależy od poziomu */
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 1.15rem;
+  display: flex;
+  align-items: flex-start;
+  transition: color 0.3s ease; /* Płynna zmiana koloru */
+}
+
+/* Nazwa bohatera w kolorze poziomu */
+.hero-level-0 .hero-instance-name { color: #9ca3af; } /* Zwykły - szary */
+.hero-level-1 .hero-instance-name { color: #ffffff; } /* Początkujący - biały */
+.hero-level-2 .hero-instance-name { color: #e6f7ff; } /* Uczący się - jasnoniebieski */
+.hero-level-3 .hero-instance-name { color: #b3e6ff; } /* Doświadczony - niebieski */
+.hero-level-4 .hero-instance-name { color: #85c9ff; } /* Wykwalifikowany - niebieski */
+.hero-level-5 .hero-instance-name { color: #5fb2ff; } /* Ekspert - niebieski */
+.hero-level-6 .hero-instance-name { color: #7d5bed; } /* Mistrz - fioletowy */
+.hero-level-7 .hero-instance-name { color: #9d4edd; } /* Wielki Mistrz - fioletowy */
+.hero-level-8 .hero-instance-name { color: #c77dff; } /* Arcymistrz - fioletowy */
+.hero-level-9 .hero-instance-name { color: #e2b2ff; } /* Boski - jasnofioletowy */
+.hero-level-10 .hero-instance-name { color: #ffd700; } /* Legendarny - złoty */
+
+/* Efekty dla najwyższych poziomów */
+.hero-level-8 .hero-instance-name,
+.hero-level-9 .hero-instance-name,
+.hero-level-10 .hero-instance-name {
+  text-shadow: 0 0 8px currentColor;
+}
+
+/* Specjalny efekt dla poziomu legendarnego */
+.hero-level-10 .hero-instance-name {
+  text-shadow: 0 0 12px #ffd700, 0 0 20px #ffd700;
+  animation: legendary-glow 2s ease-in-out infinite alternate;
+}
+
+/* Usuń domyślny kolor z .hero-instance-name */
+.hero-instance-name {
+  font-size: 0.7rem;
+  line-height: 1;
+  /* color: #ffd166; */ /* Usunięte - teraz kolor zależy od poziomu */
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 1.15rem;
+  display: flex;
+  align-items: flex-start;
+  transition: color 0.3s ease; /* Płynna zmiana koloru */
+}
+
+/* Nazwa poziomu kopacza - kolory odpowiadające poziomom */
+.hero-level-0 .hero-level-name { color: #9ca3af; } /* Zwykły - szary */
+.hero-level-1 .hero-level-name { color: #ffffff; } /* Początkujący - biały */
+.hero-level-2 .hero-level-name { color: #e6f7ff; } /* Uczący się - jasnoniebieski */
+.hero-level-3 .hero-level-name { color: #b3e6ff; } /* Doświadczony - niebieski */
+.hero-level-4 .hero-level-name { color: #85c9ff; } /* Wykwalifikowany - niebieski */
+.hero-level-5 .hero-level-name { color: #5fb2ff; } /* Ekspert - niebieski */
+.hero-level-6 .hero-level-name { color: #7d5bed; } /* Mistrz - fioletowy */
+.hero-level-7 .hero-level-name { color: #9d4edd; } /* Wielki Mistrz - fioletowy */
+.hero-level-8 .hero-level-name { color: #c77dff; } /* Arcymistrz - fioletowy */
+.hero-level-9 .hero-level-name { color: #e2b2ff; } /* Boski - jasnofioletowy */
+.hero-level-10 .hero-level-name { color: #ffd700; } /* Legendarny - złoty */
+
+/* Efekty dla najwyższych poziomów */
+.hero-level-8 .hero-level-name,
+.hero-level-9 .hero-level-name,
+.hero-level-10 .hero-level-name {
+  text-shadow: 0 0 6px currentColor;
+  font-weight: 600;
+}
+
+/* Specjalny efekt dla poziomu legendarnego */
+.hero-level-10 .hero-level-name {
+  text-shadow: 0 0 8px #ffd700, 0 0 12px #ffd700;
+  font-weight: 700;
+}
+
+/* Dodaj efekt świecenia dla najwyższych poziomów */
+.hero-level-8 .hero-instance-name,
+.hero-level-9 .hero-instance-name,
+.hero-level-10 .hero-instance-name {
+  text-shadow: 0 0 8px currentColor;
+}
+
+/* Specjalny efekt dla poziomu legendarnego */
+.hero-level-10 .hero-instance-name {
+  text-shadow: 0 0 12px #ffd700, 0 0 20px #ffd700;
+  animation: legendary-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes legendary-glow {
+  from { text-shadow: 0 0 12px #ffd700, 0 0 20px #ffd700; }
+  to { text-shadow: 0 0 16px #ffd700, 0 0 24px #ffd700, 0 0 32px #ffd700; }
+}
+
+/* Dodaj etykietę poziomu obok nazwy */
+.hero-level-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid currentColor;
+  color: inherit;
+  opacity: 0.8;
+}
+
+.hero-class-name {
+  font-size: 0.65rem;
+  line-height: 1;
+  color: #9ca3af;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 1.15rem;
+  display: flex;
+  align-items: flex-start;
+}
+
+.hero-info.expanded .hero-class-name {
+  white-space: normal;
+  height: auto;
+  min-height: 1.15rem;
+}
+
+/* Dodatkowe informacje w rozwiniętym panelu */
+.hero-details {
+  display: none;
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  line-height: 1.3;
+}
+
+.hero-info.expanded .hero-details {
+  display: block;
+}
+
+.hero-stat {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.hero-stat:last-child {
+  margin-bottom: 0;
+}
+
+.hero-stat-label {
+  color: #9ca3af;
+}
+
+.hero-stat-value {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Wiadro na diamenty pomiędzy bohaterem a korytarzem */
+.bucket { 
+  min-width: 64px; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  gap: 4px; 
+  flex-shrink: 0; 
+  cursor: pointer; 
+}
+
+.bucket-icon { font-size: 1.1rem; }
+
+.bucket-cap { 
+  font-size: 0.75rem; 
+  color: #cbd5e1; /* Domyślny kolor */
+  transition: color 0.3s ease;
+}
+
+.bucket-bar { 
+  width: 44px; 
+  height: 9px; 
+  background: #2b2b2b; 
+  border-radius: 6px; 
+  overflow: hidden; 
+}
+
+.bucket-fill { 
+  height: 100%; 
+  width: 0%; 
+  background: #ffd166; 
+  border-radius: 6px; 
+  transition: width 0.25s linear, background-color 0.3s ease;
+}
+
+/* Czerwony kolor gdy wiadro jest pełne */
+.bucket.full .bucket-cap {
+  color: #ef4444; /* Czerwony kolor tekstu */
+}
+
+.bucket.full .bucket-fill {
+  background: #ef4444; /* Czerwony kolor paska postępu */
+}
+
+.bucket:hover .bucket-icon { transform: translateY(-2px); }
+
+/* Pasek korytarza */
+.wall { flex-grow: 1; min-width: 0; height: 22px; background: #555; border-radius: 10px; position: relative; display: flex; /* <--- Dodaj to */
+  align-items: center }
+.wall-fill { height: 80%; width: 80%; background: #0cb1d6; border-radius: 10px; transition: left 0.25s linear, width 0.25s linear; }
+
+/* Etykieta pokazująca pozostałe diamenty na ścianie */
+.wall-label {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.75rem;
+  color: #ffffff;
+  background: rgba(0,0,0,0.35);
+  padding: 3px 6px;
+  border-radius: 6px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Pozycja bohatera */
+.hero-position { position: absolute; top: 0px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 2px solid #0c80a6; transition: left 0.3s cubic-bezier(.4,0,.2,1); }
+/* Usunięto ring progressu z bohatera w korytarzu – tylko w szybie */
+.hero-position::after { content: none; }
+.hero-position > div { transform: scale(1.2); pointer-events: none; user-select: none; }
+.hero-position.unloading { left: 0% !important; transition: none !important; }
+
+/* Pasek postępu */
+.progress-container, .progress-fill { display: none !important; }
+
+/* Przycisk Kop z pulą diamentów */
+button#btn-mine { 
+  margin: 12px 0; 
+  width: 200px; /* Zwiększone dla lepszego dopasowania tekstu */
+  font-weight: 900; 
+  font-size: 1.3rem; 
+  padding: 18px 20px; /* Dodany padding poziomy */
+  border-radius: 16px; 
+  border: none; 
+  background: #0cb1d6; 
+  color: #121212; 
+  cursor: pointer; 
+  transition: background 0.3s;
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap; /* Zapobiega zawijaniu tekstu */
+  text-align: center; /* Wyśrodkowanie tekstu */
+  min-height: 60px; /* Minimalna wysokość */
+  display: flex; /* Dla lepszego wyśrodkowania */
+  align-items: center; /* Wyśrodkowanie w pionie */
+  justify-content: center; /* Wyśrodkowanie w poziomie */
+}
+
+button#btn-mine:hover { background: #0899bb; }
+
+/* Pula diamentów free - pasek postępu */
+.free-diamonds-pool {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 0 0 16px 16px;
+  overflow: hidden;
+}
+
+.free-diamonds-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #4caf50, #8bc34a, #cddc39);
+  border-radius: 0 0 16px 16px;
+  transition: width 0.3s ease;
+  position: relative;
+}
+
+/* Animowany gradient dla puli */
+.free-diamonds-fill::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+/* Etykieta puli */
+.free-diamonds-label {
+  position: absolute;
+  top: -20px;
+  right: 0;
+  font-size: 0.7rem;
+  color: #4caf50;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* Styl dla pustej puli */
+button#btn-mine:disabled .free-diamonds-fill {
+  background: #f44336;
+  animation: none;
+}
+
+button#btn-mine:disabled .free-diamonds-fill::before {
+  display: none;
+}
+
+button#btn-mine:disabled .free-diamonds-label {
+  color: #f44336;
+}
+
+/* Sklep */
+.shop-container { background: #222; border-radius: 16px; padding: 16px 20px; margin-top: 4px; width: 100%; max-width: 640px; }
+.shop-title { font-weight: 900; font-size: 1.2rem; margin-bottom: 12px; text-align: center; }
+.shop-list { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; height: 110px; }
+.shop-list::-webkit-scrollbar { height: 5px; }
+.shop-list::-webkit-scrollbar-thumb { background: #0cb1d6; border-radius: 4px; }
+.shop-item { background: #333; border-radius: 16px; min-width: 90px; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 12px 8px; box-shadow: 0 0 8px #0cb1d6bb; cursor: pointer; transition: background-color 0.3s; flex-shrink: 0; }
+.shop-item:hover { background: #0cb1d6; color: #121212; }
+.shop-icon { font-size: 2.7rem; }
+.shop-name { margin-top: 8px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shop-cost { font-weight: 700; margin-top: 6px; }
+
+/* --- Sprite diamentu --- */
+/* Efekt lotu diamentu do licznika */
+.diamond-sprite {
+  position: fixed;
+  font-size: 20px;
+  transform: translate(-50%, -50%) scale(1);
+  animation: diamond-fly 700ms cubic-bezier(.2,.7,.2,1) forwards;
+  pointer-events: none;
+  z-index: 9999;
+  will-change: transform, opacity;
+  /* Usunięte opóźnienie - diamenty startują od razu */
+}
+
+@keyframes diamond-fly {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, -120px))) scale(0.6);
+    opacity: 0;
+  }
+}
+
+/* removed legacy @keyframes diamond-move to avoid conflicts with JS animation */
+
+/* Ikona windziarza w szybie z okrągłym wskaźnikiem postępu */
+.wz-node {
+  position: absolute;
+  width: var(--ring, 56px);
+  height: var(--ring, 56px);
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  border: 2px solid #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #111;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+}
+
+.wz-node::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  background: conic-gradient(#06d6a0 calc(var(--prog, 0) * 1deg), transparent 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(50% - 7px), #000 calc(50% - 7px));
+  mask: radial-gradient(farthest-side, transparent calc(50% - 7px), #000 calc(50% - 7px));
+}
+.wz-node .wz-icon {
+  font-size: var(--icon, 58px);
+  line-height: 1;
+  user-select: none;
+  pointer-events: none;
+}
+
+#popup {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.45);
+  z-index: 12000;
+}
+#popup[style*="display: flex"] {
+  display: flex !important;
+}
+#popup-content {
+  background: #222;
+  border-radius: 18px;
+  box-shadow: 0 8px 32px #000a;
+  padding: 32px 24px;
+  min-width: 260px;
+  max-width: 90vw;
+  max-height: 90vh;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+#popup-content h3 {
+  font-size: 1.3rem;
+  margin-bottom: 12px;
+}
+#popup-content .stat {
+  font-size: 1rem;
+  margin-bottom: 8px;
+}
+#popup-action, #popup-close {
+  margin: 12px 0 0 0;
+  padding: 14px 32px;
+  font-size: 1.1rem;
+  border-radius: 14px;
+  border: none;
+  background: #0cb1d6;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px #0003;
+  cursor: pointer;
+  transition: background 0.2s;
+  outline: none;
+}
+#popup-action:hover, #popup-close:hover {
+  background: #0899bb;
+}
+@media (max-width: 600px) {
+  #popup-content {
+    padding: 18px 8px;
+    min-width: 180px;
+  }
+  #popup-action, #popup-close {
+    padding: 12px 16px;
+    font-size: 1rem;
+  }
+  /* Dodaj nowe style dla obwolut */
+  .hero-frame {
+    position: relative;
+    border-radius: 8px;
+    padding: 2px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  }
+
+  /* 10 poziomów - kolory od białego do złotego */
+  .hero-level-1 { background: linear-gradient(135deg, #ffffff, #f0f0f0); }
+  .hero-level-2 { background: linear-gradient(135deg, #e6f7ff, #a8d8ff); }
+  .hero-level-3 { background: linear-gradient(135deg, #b3e6ff, #66b3ff); }
+  .hero-level-4 { background: linear-gradient(135deg, #85c9ff, #3395ff); }
+  .hero-level-5 { background: linear-gradient(135deg, #5fb2ff, #1c7fff); }
+  .hero-level-6 { background: linear-gradient(135deg, #7d5bed, #4a2dbf); }
+  .hero-level-7 { background: linear-gradient(135deg, #9d4edd, #6a1bb5); }
+  .hero-level-8 { background: linear-gradient(135deg, #c77dff, #9d4edd); }
+  .hero-level-9 { background: linear-gradient(135deg, #e2b2ff, #bb6bff); }
+  .hero-level-10 { background: linear-gradient(135deg, #ffd700, #ffc400); box-shadow: 0 0 15px rgba(255, 215, 0, 0.5); }
+}
+
+/* Kołowy pasek postępu dla windziarza */
+.windziarz-progress-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 10;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.windziarz-progress-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--progress-color, #06d6a0) calc(var(--progress, 0) * 1deg),
+    transparent 0
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(50% - 2px), #000 calc(50% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(50% - 2px), #000 calc(50% - 2px));
+}
+
+/* Kolory dla różnych faz */
+.windziarz-progress-ring.moving::before {
+  --progress-color: #118ab2;
+}
+
+.windziarz-progress-ring.loading::before {
+  --progress-color: #ffd166;
+}
+
+.windziarz-progress-ring.returning::before {
+  --progress-color: #ef476f;
+}
+
+.windziarz-progress-ring.unloading::before {
+  --progress-color: #06d6a0;
+}
+
+/* Animacja dla aktywnej fazy */
+.windziarz-progress-ring.active::before {
+  animation: windziarz-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes windziarz-pulse {
+  from { opacity: 0.8; }
+  to { opacity: 1; }
+}
+
+
+
+/* Pionowy pasek postępu w szybie windy */
+.elevator-progress-bar {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  z-index: 5;
+}
+
+.elevator-progress-fill {
+  position: absolute;
+  top: 0; /* Zmienione z bottom: 0 na top: 0 */
+  left: 0;
+  width: 100%;
+  height: 0%;
+  background: linear-gradient(to bottom, #06d6a0, #118ab2); /* Zmienione z to top na to bottom */
+  border-radius: 2px;
+  transition: height 0.1s ease;
+  box-shadow: 0 0 8px rgba(6, 214, 160, 0.5);
+}
+
+/* Animacja dla aktywnego paska */
+.elevator-progress-fill.active {
+  animation: elevator-pulse 2s ease-in-out infinite alternate;
+}
+
+@keyframes elevator-pulse {
+  from { box-shadow: 0 0 8px rgba(6, 214, 160, 0.5); }
+  to { box-shadow: 0 0 12px rgba(6, 214, 160, 0.8); }
+}
+
+/* Styling dla sejfu */
+.safe {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  border: 2px solid #daa520;
+  border-radius: 8px;
+  padding: 8px 12px;
+  text-align: center;
+  color: #8b4513;
+  font-weight: bold;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  margin: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Platforma rozładunkowa */
+.unloading-platform {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 120px;
+    z-index: 5;
+    background: linear-gradient(135deg, #8B4513, #A0522D);
+    border: 3px solid #654321;
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.unloading-platform:hover {
+    background: linear-gradient(135deg, #A0522D, #CD853F);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+}
+
+/* Bohater transportowy */
+.transport-hero {
+  flex: 1;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Sejf */
+.safe-content {
+  flex: 1;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Ikony i etykiety */
+.platform-icon, .transport-icon, .safe-icon {
+  font-size: 1.2rem;
+  margin-bottom: 2px;
+  display: block;
+  text-align: center;
+}
+
+.platform-label, .transport-label, .safe-label {
+  font-size: 0.7rem;
+  font-weight: bold;
+  display: block;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Liczniki diamentów */
+.platform-diamonds, .safe-diamonds, .transport-load {
+  font-size: 0.6rem;
+  color: #06d6a0;
+  font-weight: bold;
+  margin-top: 2px;
+}
+
+/* Wskaźnik pozycji bohatera transportowego */
+.hero-position-indicator {
+  transition: left 0.1s ease;
+}
+
+/* Styling dla kurierów */
+.kurier {
+  transition: left 0.1s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  cursor: pointer;
+}
+
+.kurier:hover {
+  transform: translate(-50%, -50%) scale(1.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+.kurier-icon {
+  font-size: 1.2rem;
+  margin-bottom: 2px;
+  text-align: center;
+}
+
+.kurier-load {
+  font-size: 0.6rem;
+  color: #ffffff;
+  font-weight: bold;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.no-kurier-info {
+  flex: 1;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  color: #999;
+  font-size: 0.8rem;
+}
+
+.platform-counter {
+    font-size: 18px;
+    margin-top: 10px;
+    color: #FFD700;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
