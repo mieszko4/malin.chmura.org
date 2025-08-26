@@ -1219,10 +1219,10 @@
                 } else {
                     // Kurier nie ma diamentów do rozładowania - wróć do platformy
                     console.log(`Kurier ${kurier.id}: Brak diamentów do rozładowania, wracam do platformy`);
-                    kurier.state = "moving";
+                    kurier.state = "returning";
                     kurier.target = "platform";
                     kurier.direction = "left";
-                    kurier.progress = 0;
+                    kurier.progress = 1.0; // Zaczyna od prawej krawędzi
                 }
             }
             
@@ -2749,6 +2749,9 @@
           // PROGRESS ABSOLUTNY: 0.0 = lewa krawędź, 1.0 = prawa krawędź
           // Niezależnie od kierunku ruchu!
           leftPosition = moveAreaStart + (moveAreaWidth * progress);
+          
+          // Debug: loguj obliczenia
+          console.log(`calculateKurierPosition: progress=${progress}, target=${target}, leftPosition=${leftPosition}, containerWidth=${containerWidth}`);
           
           return leftPosition;
         }
