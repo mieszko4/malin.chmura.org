@@ -1109,6 +1109,11 @@ button#btn-mine:disabled .free-diamonds-label {
   border: 2px solid #095a80 !important;
 }
 
+.kurier-state-moving {
+  background: #118ab2 !important; /* Niebieski dla ruchu */
+  border: 2px solid #095a80 !important;
+}
+
 .kurier-state-returning {
   background: #ff6b35 !important;
   border: 2px solid #cc4a1b !important;

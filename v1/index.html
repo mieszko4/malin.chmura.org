@@ -1187,6 +1187,9 @@
             // Odejmuj czas od timera
             if (kurier.loadingTimer > 0) {
                 kurier.loadingTimer -= dt;
+                
+                // Odśwież licznik kuriera w czasie rzeczywistym podczas ładowania
+                renderTransportContainer();
             }
             
             // Gdy timer dobiegnie końca, zakończ ładowanie
@@ -1229,6 +1232,9 @@
             // Odejmuj czas od timera
             if (kurier.unloadingTimer > 0) {
                 kurier.unloadingTimer -= dt;
+                
+                // Odśwież licznik kuriera w czasie rzeczywistym podczas rozładunku
+                renderTransportContainer();
             }
             
             // Gdy timer dobiegnie końca, zakończ rozładunek
@@ -2695,7 +2701,7 @@
         
         kurierEl.innerHTML = `
           <div class="kurier-icon">${kurier.icon}</div>
-          <div class="kurier-load">${formatNumber(kurier.currentLoad)}/${formatNumber(kurier.capacity)}</div>
+          <div class="kurier-load">${formatNumber(kurier.carried || 0)}/${formatNumber(kurier.capacity || 100)}</div>
           <div class="kurier-progress">Progress: ${(kurier.progress || 0).toFixed(3)}</div>
         `;
         
@@ -2704,6 +2710,7 @@
           'idle': 'kurier-state-idle', 
           'moving-to-platform': 'kurier-state-moving-to-platform', 
           'loading': 'kurier-state-loading', 
+          'moving': 'kurier-state-moving', 
           'moving-to-safe': 'kurier-state-moving-to-safe', 
           'returning': 'kurier-state-returning',
           'unloading': 'kurier-state-unloading' 
@@ -2731,17 +2738,20 @@
           const KURIER_WIDTH = 60;
           const CORRIDOR_PADDING = 12;
           
-          // Pozycja startowa (lewa krawędź platformy)
-          const platformStartPos = 0; // 0px - skrajnie z lewej
+          // Pozycja startowa (platforma) - uwzględniam margin z CSS
+          const platformStartPos = -25; // 20px - margin z CSS dla .kurierzy-area
           
-          // Pozycja końcowa (prawa krawędź sejfu)
+          // Pozycja końcowa (sejf) - uwzględniam margin z CSS
           const containerWidth = kurierzyArea.offsetWidth;
-          const safeEndPos = containerWidth; // Koniec kontenera (prawa krawędź sejfu)
+          const safeEndPos = containerWidth - 75; // Koniec kontenera minus margin
           
-          // Obszar ruchu kuriera (cała szerokość)
-          const moveAreaStart = platformStartPos;
-          const moveAreaEnd = safeEndPos;
+          // Obszar ruchu kuriera (od platformy do sejfu)
+          const moveAreaStart = platformStartPos; // 20px - platforma
+          const moveAreaEnd = safeEndPos; // containerWidth-20 - sejf
           const moveAreaWidth = moveAreaEnd - moveAreaStart;
+          
+          // Debug: loguj obszar ruchu
+          console.log(`Obszar ruchu: ${moveAreaStart}px → ${moveAreaEnd}px (szerokość: ${moveAreaWidth}px)`);
           
           // ZAKOTWIENIE PO LEWEJ: progress 0 = lewa krawędź, progress 1 = prawa krawędź
           let leftPosition;
