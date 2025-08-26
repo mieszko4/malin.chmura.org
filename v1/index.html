@@ -1166,6 +1166,9 @@
             // Odejmuj czas od timera
             if (kurier.loadingTimer > 0) {
                 kurier.loadingTimer -= dt;
+                
+                // Odśwież licznik kuriera w czasie rzeczywistym podczas ładowania
+                renderTransportContainer();
             }
             
             // Gdy timer dobiegnie końca, zakończ ładowanie
@@ -1205,6 +1208,9 @@
             // Odejmuj czas od timera
             if (kurier.unloadingTimer > 0) {
                 kurier.unloadingTimer -= dt;
+                
+                // Odśwież licznik kuriera w czasie rzeczywistym podczas rozładunku
+                renderTransportContainer();
             }
             
             // Gdy timer dobiegnie końca, zakończ rozładunek
