@@ -1076,14 +1076,11 @@
     // Sprawdź czy są kupione kurierzy (debug usunięty)
     
     if (kurierzyTeam.length === 0) {
-        console.log("Brak kurierów w teamie - sprawdź czy kupiłeś jakiegoś");
         return;
     }
     
     // Aktualizuj kurierów
-    console.log(`updateTransportSystem: kurierzyTeam.length=${kurierzyTeam.length}, transportDiamonds=${transportDiamonds}`);
     kurierzyTeam.forEach((kurier, index) => {
-        console.log(`Kurier ${kurier.id}: state=${kurier.state}, progress=${kurier.progress}, target=${kurier.target}`);
         updateKurier(kurier, dt);
     });
     
@@ -1098,7 +1095,6 @@
     }
 
     // Logika stanów kuriera
-    console.log(`Kurier ${kurier.id}: Rozpoczynam updateKurier, state=${kurier.state}, progress=${kurier.progress}, target=${kurier.target}`);
     
     switch (kurier.state) {
         case "idle":
@@ -1106,37 +1102,28 @@
             const windziarzUnloading = windziarzTeam.some(wz => wz.state === "unloading" && wz.unloadingTimer > 0);
             const kurierHasSpace = (kurier.carried || 0) < (kurier.capacity || 1000);
             
-            console.log(`Kurier ${kurier.id} debug: capacity=${kurier.capacity}, speed=${kurier.speed}, loadingspeed=${kurier.loadingspeed}`);
-            
-            console.log(`Kurier ${kurier.id} w idle: transportDiamonds=${transportDiamonds}, windziarzUnloading=${windziarzUnloading}, kurierHasSpace=${kurierHasSpace}, carried=${kurier.carried}, capacity=${kurier.capacity}`);
+
             
             if (transportDiamonds > 0 && !windziarzUnloading) {
                 // Brak windziarza rozładowującego - kurier może ładować
                 kurier.state = "loading";
-                console.log(`Kurier ${kurier.id}: Przechodzę do loading - brak windziarza rozładowującego`);
             } else if (transportDiamonds > 0 && windziarzUnloading && kurierHasSpace) {
                 // Windziarz rozładowuje i kurier ma miejsce - kurier czeka na pełny rozładunek
-                console.log(`Kurier ${kurier.id}: Czekam na zakończenie rozładunku windziarza - mam miejsce na nowe diamenty`);
             } else if (transportDiamonds > 0 && windziarzUnloading && !kurierHasSpace) {
                 // Windziarz rozładowuje ale kurier jest pełny - może ładować mimo rozładunku
                 kurier.state = "loading";
-                console.log(`Kurier ${kurier.id}: Przechodzę do loading - jestem pełny, nie muszę czekać na rozładunek`);
             } else if (transportDiamonds <= 0) {
                 // Brak diamentów na platformie
-                console.log(`Kurier ${kurier.id}: Brak diamentów na platformie (${transportDiamonds}), czekam`);
             } else {
                 // Inne przypadki
-                console.log(`Kurier ${kurier.id}: Nieznany przypadek, czekam`);
             }
             break;
             
         case "moving-to-platform":
-            console.log(`Kurier ${kurier.id}: Przechodzę ze stanu moving-to-platform do moving`);
             kurier.state = "moving";
             kurier.target = "platform";
             kurier.direction = "left";
             kurier.progress = 0;
-            console.log(`Kurier ${kurier.id}: Stan zmieniony na: ${kurier.state}`);
             break;
             
         case "moving":
@@ -1144,11 +1131,8 @@
             const moveSpeed = (kurier.speed || 1.0) * dt * 1.0; // Pełna prędkość
             kurier.progress += moveSpeed;
             
-            console.log(`Kurier ${kurier.id} moving: progress=${kurier.progress.toFixed(3)}, target=${kurier.target}, speed=${moveSpeed.toFixed(3)}`);
-            
             if (kurier.progress >= 1.0) {
                 kurier.progress = 1.0;
-                console.log(`Kurier ${kurier.id}: Dotarłem do sejfu, przechodzę do unloading`);
                 kurier.state = "unloading";
             }
             break;
@@ -1158,11 +1142,8 @@
             const returnSpeed = (kurier.speed || 1.0) * dt * 1.0; // Pełna prędkość
             kurier.progress -= returnSpeed; // Zmniejsz progress (1.0 → 0.0)
             
-            console.log(`Kurier ${kurier.id} returning: progress=${kurier.progress.toFixed(3)}, target=${kurier.target}, speed=${returnSpeed.toFixed(3)}`);
-            
             if (kurier.progress <= 0.0) {
                 kurier.progress = 0.0;
-                console.log(`Kurier ${kurier.id}: Dotarłem do platformy, przechodzę do loading`);
                 kurier.state = "loading";
             }
             break;
@@ -1175,10 +1156,8 @@
                     // Ustaw timer na czas ładowania
                     const loadingSpeed = kurier.loadingspeed || 50;
                     kurier.loadingTimer = loadAmount / loadingSpeed;
-                    console.log(`Kurier ${kurier.id}: Rozpoczynam ładowanie ${loadAmount} diamentów przez ${kurier.loadingTimer.toFixed(2)}s`);
                 } else {
                     // Brak diamentów na platformie - wróć do stanu idle
-                    console.log(`Kurier ${kurier.id}: Brak diamentów na platformie, wracam do idle`);
                     kurier.state = "idle";
                     kurier.progress = 0;
                 }
@@ -1187,9 +1166,6 @@
             // Odejmuj czas od timera
             if (kurier.loadingTimer > 0) {
                 kurier.loadingTimer -= dt;
-                
-                // Odśwież licznik kuriera w czasie rzeczywistym podczas ładowania
-                renderTransportContainer();
             }
             
             // Gdy timer dobiegnie końca, zakończ ładowanie
@@ -1198,7 +1174,6 @@
                 if (loadAmount > 0) {
                     transportDiamonds -= loadAmount;
                     kurier.carried = loadAmount;
-                    console.log(`Kurier ${kurier.id}: Ładowanie zakończone, carried=${kurier.carried}`);
                     
                     // Przejdź do ruchu do sejfu
                     kurier.state = "moving";
@@ -1218,10 +1193,8 @@
                     // Ustaw timer na czas rozładunku
                     const unloadingSpeed = kurier.loadingspeed || 50;
                     kurier.unloadingTimer = kurier.carried / unloadingSpeed;
-                    console.log(`Kurier ${kurier.id}: Rozpoczynam rozładunek ${kurier.carried} diamentów przez ${kurier.unloadingTimer.toFixed(2)}s`);
                 } else {
                     // Kurier nie ma diamentów do rozładowania - wróć do platformy
-                    console.log(`Kurier ${kurier.id}: Brak diamentów do rozładowania, wracam do platformy`);
                     kurier.state = "returning";
                     kurier.target = "platform";
                     kurier.direction = "left";
@@ -1232,16 +1205,12 @@
             // Odejmuj czas od timera
             if (kurier.unloadingTimer > 0) {
                 kurier.unloadingTimer -= dt;
-                
-                // Odśwież licznik kuriera w czasie rzeczywistym podczas rozładunku
-                renderTransportContainer();
             }
             
             // Gdy timer dobiegnie końca, zakończ rozładunek
             if (kurier.unloadingTimer <= 0) {
                 if (kurier.carried > 0) {
                     safeDiamonds += kurier.carried;
-                    console.log(`Kurier ${kurier.id}: Rozładunek zakończony, rozładowano ${kurier.carried} diamentów`);
                     kurier.carried = 0;
                     
                     // Przejdź do fazy returning (powrót do platformy)
@@ -1256,14 +1225,10 @@
             break;
             
         default:
-            console.log(`Kurier ${kurier.id}: Nieznany stan: ${kurier.state}`);
             break;
     }
     
         // Pozycjonowanie jest teraz w renderTransportContainer() - usunięte stąd
-    
-    // Aktualizuj kontener transportowy
-    renderTransportContainer();
 }
 
   function destroyCorridor(index) {
